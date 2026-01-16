@@ -47,6 +47,44 @@ export const calculateMacros = (calories) => {
     };
 };
 
+
+export const calculateMealTargets = (dailyCalories, goal) => {
+    // Splits based on user request
+    let splits = {
+        breakfast: 0.25,
+        lunch: 0.40,
+        snacks: 0.10,
+        dinner: 0.25
+    };
+
+    if (goal === 'weightLoss' || goal === 'loss') {
+        splits = { breakfast: 0.30, lunch: 0.40, snacks: 0.10, dinner: 0.20 };
+    } else {
+        // Normalize Standard 25/40/10/30 (105 total) to 100
+        const total = 25 + 40 + 10 + 30;
+        splits = {
+            breakfast: 25 / total,
+            lunch: 40 / total,
+            snacks: 10 / total,
+            dinner: 30 / total
+        };
+    }
+
+    return {
+        breakfast: Math.round(dailyCalories * splits.breakfast),
+        lunch: Math.round(dailyCalories * splits.lunch),
+        snacks: Math.round(dailyCalories * splits.snacks),
+        dinner: Math.round(dailyCalories * splits.dinner)
+    };
+};
+
+export const calculateSmartPortion = (itemCaloriesPer100g, remainingCalories) => {
+    if (!itemCaloriesPer100g || itemCaloriesPer100g <= 0) return 0;
+    if (remainingCalories <= 0) return 0;
+    const amountInGrams = (remainingCalories / itemCaloriesPer100g) * 100;
+    return Math.round(amountInGrams);
+};
+
 export const findSwaps = (originalItem, database) => {
     if (!originalItem) return [];
 
@@ -81,3 +119,4 @@ export const findSwaps = (originalItem, database) => {
         };
     }).slice(0, 5); // Return top 5
 };
+

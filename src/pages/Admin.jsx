@@ -8,7 +8,10 @@ const Admin = () => {
     const [stats, setStats] = useState(null);
     const [errors, setErrors] = useState([]);
 
+    // Updated to match "Indian_Food_Master" Excel headers
     const requiredHeaders = ['Food Item', 'Serving Size', 'Calories', 'Protein', 'Carbs', 'Fats', 'Category'];
+    // Also allow the real Excel headers as alternative
+    const realExcelHeaders = ['Category', 'Food Item', 'Energy (kcal / 100g)', 'Protein (g / 100g)', 'Carbohydrates (g / 100g)', 'Fat (g / 100g)'];
 
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
@@ -34,12 +37,15 @@ const Admin = () => {
 
     const validateAndProcess = (results) => {
         const headers = results.meta.fields;
-        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
 
-        if (missingHeaders.length > 0) {
+        // Check if it matches our template OR the real master sheet
+        const isTemplate = requiredHeaders.every(h => headers.includes(h));
+        const isRealMaster = realExcelHeaders.every(h => headers.includes(h));
+
+        if (!isTemplate && !isRealMaster) {
             setUploadStatus("error");
-            setErrors([`Missing required headers: ${missingHeaders.join(', ')}`]);
-            toast.error("Invalid file format");
+            setErrors([`Invalid Format. Expected headers matching Template OR Master Sheet.`]);
+            toast.error("Invalid file headers");
             return;
         }
 
@@ -48,10 +54,17 @@ const Admin = () => {
         let validCount = 0;
 
         data.forEach((row, index) => {
-            if (!row['Food Item'] || !row['Calories']) {
-                validationErrors.push(`Row ${index + 2}: Missing Name or Calories`);
-            } else if (isNaN(row['Calories'])) {
-                validationErrors.push(`Row ${index + 2}: Calories must be a number`);
+            // Map real excel keys to our internal keys if needed
+            const name = row['Food Item'];
+            const cal = row['Calories'] || row['Energy (kcal / 100g)'];
+
+            if (!name || cal === undefined || cal === "") {
+                // skip empty rows that might have slipped through
+                return;
+            }
+
+            if (isNaN(cal)) {
+                validationErrors.push(`Row ${index + 2}: Calories/Energy must be a number`);
             } else {
                 validCount++;
             }

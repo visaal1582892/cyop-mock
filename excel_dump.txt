@@ -1,0 +1,119 @@
+
+--- Inspecting: nutri plan.xlsx ---
+Sheet Name: Sheet1
+Headers: [null,null,"weight",78,"< Input from the patient"]
+First 5 Rows of Data:
+[
+  [
+    null,
+    null,
+    "Target loss in 1 month",
+    0,
+    "< Input from the patient"
+  ],
+  [],
+  [
+    "total caolories required",
+    null,
+    2059.2000000000003,
+    "< To be calculated by the system"
+  ],
+  [],
+  [
+    "weight loss goal calories",
+    null,
+    2059.2000000000003,
+    "< To be calculated by the system"
+  ]
+]
+
+--- Inspecting: Indian_Food_Master_Calorie and CPF.xlsx ---
+Sheet Name: Indian_Food_Master_250+
+Headers: ["Category","Food Item","Sub-type / Variety","Typical Form","Region Presence","Edible Portion %","Energy (kcal / 100g)","Carbohydrates (g / 100g)","Protein (g / 100g)","Fat (g / 100g)","Fibre (g/100g)","Notes"]
+First 5 Rows of Data:
+[
+  [
+    "Cereals & Millets",
+    "Rice",
+    "White",
+    "Raw",
+    "Pan-India",
+    100,
+    345,
+    78.2,
+    7.5,
+    0.6
+  ],
+  [
+    "Cereals & Millets",
+    "Rice",
+    "Brown",
+    "Raw",
+    "Pan-India",
+    100,
+    360,
+    77.2,
+    7.9,
+    2.7,
+    null,
+    null,
+    null,
+    "Beverages",
+    "Juices",
+    "Fresh/Packaged"
+  ],
+  [
+    "Cereals & Millets",
+    "Rice",
+    "Parboiled",
+    "Raw",
+    "South/East",
+    100,
+    346,
+    78,
+    7.1,
+    0.7,
+    null,
+    null,
+    null,
+    null,
+    "Aireated drinks",
+    "Fresh/Packaged"
+  ],
+  [
+    "Cereals & Millets",
+    "Rice",
+    "Mohanbhog",
+    "Raw",
+    "North",
+    100,
+    350,
+    79,
+    7,
+    0.6,
+    null,
+    null,
+    null,
+    null,
+    "Coffee",
+    "Fresh/Packaged"
+  ],
+  [
+    "Cereals & Millets",
+    "Rice",
+    "Sona Masuri",
+    "Raw",
+    "South",
+    100,
+    345,
+    78.2,
+    7.4,
+    0.5,
+    null,
+    null,
+    null,
+    null,
+    "Tea",
+    "Green/black etc"
+  ]
+]
