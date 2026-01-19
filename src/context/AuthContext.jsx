@@ -9,12 +9,12 @@ export const AuthProvider = ({ children }) => {
         return saved ? JSON.parse(saved) : null;
     });
 
-    // Patients list for the logged-in user
-    // In a real app, this would be fetched from API
-    const [patients, setPatients] = useState(() => {
-        const saved = localStorage.getItem('cyop_patients');
-        return saved ? JSON.parse(saved) : [];
-    });
+    // Dummy Patients List
+    const [patients, setPatients] = useState([
+        { id: 'p1', name: 'John Doe', age: 45, gender: 'male', height: 180, weight: 85, relationship: 'Father' },
+        { id: 'p2', name: 'Jane Doe', age: 42, gender: 'female', height: 165, weight: 68, relationship: 'Mother' },
+        { id: 'p3', name: 'Kid Doe', age: 12, gender: 'male', height: 150, weight: 45, relationship: 'Son' }
+    ]);
 
     // Currently selected patient ID (defaults to 'self' or user.id)
     const [selectedPatientId, setSelectedPatientId] = useState('self');
@@ -27,14 +27,12 @@ export const AuthProvider = ({ children }) => {
         }
     }, [user]);
 
-    useEffect(() => {
-        localStorage.setItem('cyop_patients', JSON.stringify(patients));
-    }, [patients]);
+    // No longer persisting patients to local storage as they are static dummy data for now
 
     const login = (role) => {
         const dummyUser = {
             id: role === 'admin' ? 'admin_1' : 'user_1',
-            name: role === 'admin' ? 'Admin User' : 'Regular User',
+            name: role === 'admin' ? 'Admin User' : 'Rohit Sharma',
             role: role,
             email: role === 'admin' ? 'admin@cyop.com' : 'user@cyop.com'
         };
@@ -44,22 +42,11 @@ export const AuthProvider = ({ children }) => {
 
     const logout = () => {
         setUser(null);
-        setPatients([]); // Optional: clear patients on logout if local-only
         setSelectedPatientId('self');
         localStorage.removeItem('cyop_user');
     };
 
-    const addPatient = (patient) => {
-        const newPatient = { ...patient, id: Date.now().toString() };
-        setPatients(prev => [...prev, newPatient]);
-    };
-
-    const deletePatient = (patientId) => {
-        setPatients(prev => prev.filter(p => p.id !== patientId));
-        if (selectedPatientId === patientId) {
-            setSelectedPatientId('self');
-        }
-    };
+    // addPatient and deletePatient removed as requested
 
     // Custom Foods Persistence
     const [customFoods, setCustomFoods] = useState(() => {
@@ -86,8 +73,7 @@ export const AuthProvider = ({ children }) => {
             login,
             logout,
             patients,
-            addPatient,
-            deletePatient,
+            patients,
             selectedPatientId,
             setSelectedPatientId,
             foodDatabase,

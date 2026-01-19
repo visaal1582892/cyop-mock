@@ -36,8 +36,6 @@ const AppLayout = ({ children }) => {
                         <>
                             <NavItem to="/" icon={<User size={20} />} label="Profile & Goals" />
                             <NavItem to="/planner" icon={<LayoutDashboard size={20} />} label="Meal Planner" />
-                            <NavItem to="/manage-patients" icon={<List size={20} />} label="Manage Patients" />
-                            <NavItem to="/add-patient" icon={<UserPlus size={20} />} label="Add Patient" />
                         </>
                     )}
                     {user.role === 'admin' && (
@@ -61,31 +59,29 @@ const AppLayout = ({ children }) => {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto pb-32 md:pb-0">
+            <main className="flex-1 overflow-y-auto pb-32 md:pb-0 bg-gray-50/50">
                 {/* Mobile Header */}
-                <header className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-10 safe-area-top">
-                    <span className="font-bold text-xl text-emerald-600">CYOP</span>
-                    <button onClick={handleLogout} className="text-gray-500 hover:text-red-600">
+                <header className="md:hidden bg-white/80 backdrop-blur-md border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-10 safe-area-top shadow-sm">
+                    <span className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-600">CYOP</span>
+                    <button onClick={handleLogout} className="text-gray-400 hover:text-rose-500 transition-colors p-2 rounded-lg hover:bg-rose-50">
                         <LogOut size={20} />
                     </button>
                 </header>
 
-                <div className="p-4 md:p-6 max-w-7xl mx-auto">
+                <div className="p-4 md:p-8 max-w-7xl mx-auto">
                     {children}
                 </div>
             </main>
 
             {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex justify-center gap-8 items-center z-50 safe-area-bottom shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <nav className="md:hidden fixed bottom-6 left-4 right-4 bg-white/90 backdrop-blur-xl border border-white/20 px-6 py-4 flex justify-between gap-2 items-center z-50 rounded-2xl shadow-2xl safe-area-bottom">
                 {user.role === 'user' ? (
                     <>
-                        <MobileNavItem to="/" icon={<User size={24} />} label="Profile" />
-                        <MobileNavItem to="/planner" icon={<LayoutDashboard size={24} />} label="Planner" />
-                        <MobileNavItem to="/manage-patients" icon={<List size={24} />} label="Patients" />
-                        <MobileNavItem to="/add-patient" icon={<UserPlus size={24} />} label="Add" />
+                        <MobileNavItem to="/" icon={<User size={22} />} label="Profile" />
+                        <MobileNavItem to="/planner" icon={<LayoutDashboard size={22} />} label="Planner" />
                     </>
                 ) : (
-                    <MobileNavItem to="/admin" icon={<Settings size={24} />} label="Admin" />
+                    <MobileNavItem to="/admin" icon={<Settings size={22} />} label="Admin" />
                 )}
             </nav>
         </div>
@@ -96,14 +92,18 @@ const MobileNavItem = ({ to, icon, label }) => (
     <NavLink
         to={to}
         className={({ isActive }) =>
-            `flex flex-col items-center gap-1 transition-all duration-200 ${isActive
-                ? 'text-emerald-600'
+            `flex flex-col items-center gap-1 transition-all duration-300 relative group px-2 ${isActive
+                ? 'text-emerald-600 scale-105 font-bold'
                 : 'text-gray-400 hover:text-gray-600'
             }`
         }
     >
-        {icon}
-        <span className="text-[10px] font-medium">{label}</span>
+        {({ isActive }) => (
+            <>
+                <div className={`p-1 rounded-xl transition-all ${isActive ? 'bg-emerald-100 shadow-sm' : ''}`}>{icon}</div>
+                <span className="text-[10px] font-medium tracking-wide">{label}</span>
+            </>
+        )}
     </NavLink>
 );
 
@@ -111,14 +111,19 @@ const NavItem = ({ to, icon, label }) => (
     <NavLink
         to={to}
         className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                ? 'bg-emerald-50 text-emerald-700 shadow-sm font-semibold'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            `flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group ${isActive
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 ring-4 ring-emerald-50'
+                : 'text-gray-500 hover:bg-white hover:text-emerald-600 hover:shadow-md'
             }`
         }
     >
-        {icon}
-        <span>{label}</span>
+        {({ isActive }) => (
+            <>
+                {React.cloneElement(icon, { size: 20, className: isActive ? 'text-white' : 'group-hover:scale-110 transition-transform' })}
+                <span className="font-medium tracking-wide">{label}</span>
+                {isActive && <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full animate-pulse" />}
+            </>
+        )}
     </NavLink>
 );
 

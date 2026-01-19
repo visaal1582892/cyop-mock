@@ -13,22 +13,23 @@ export const calculateTDEE = (weight) => {
     return Math.round(weight * 2.2 * 12);
 };
 
-export const calculateTargetCalories = (maintenance, goal, targetChangeKg = 0) => {
+export const calculateTargetCalories = (maintenance, targetWeightLoss = 0) => {
     // 1kg fat approx 7700 calories. 
-    // Target change per month -> daily deficit/surplus. 
-    // e.g. 2kg/month = 2 * 7700 / 30 = ~513 cal/day
+    // Target change per month -> daily deficit.
+    // e.g. 2kg/month = 2 * 7700 / 30 = ~513 cal/day deficit
 
-    // Formula: Maintenance +/- (TargetWeight * 7700 / 30)
+    // If targetWeightLoss is positive, it means they want to LOSE weight (Deficit)
+    // We treat the input "Target Weight Loss" as the amount to lose.
 
-    let adjustment = 0;
+    if (!targetWeightLoss || targetWeightLoss === 0) return maintenance;
 
-    if (goal === 'loss') {
-        adjustment = -((targetChangeKg * 7700) / 30);
-    } else if (goal === 'gain') {
-        adjustment = ((targetChangeKg * 7700) / 30);
-    }
+    const dailyDeficit = (Math.abs(targetWeightLoss) * 7700) / 30;
 
-    return Math.round(maintenance + adjustment);
+    // Ensure we don't go below unsafe limits (e.g. 1200), but for now just raw math
+    let target = maintenance - dailyDeficit;
+
+    // Safety floor (optional, but good practice)
+    return Math.max(1200, Math.round(target));
 };
 
 export const calculateMacros = (calories) => {
@@ -113,4 +114,3 @@ export const findSwaps = (originalItem, database) => {
         };
     }).slice(0, 5); // Return top 5
 };
-

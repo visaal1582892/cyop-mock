@@ -4,8 +4,6 @@ import UserProfile from './pages/UserProfile';
 import Planner from './pages/Planner';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
-import AddPatient from './pages/AddPatient';
-import ManagePatients from './pages/ManagePatients';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 
@@ -44,16 +42,6 @@ function App() {
                 <Route path="/planner" element={
                   <ProtectedRoute allowedRoles={['user']}>
                     <Planner />
-                  </ProtectedRoute>
-                } />
-                <Route path="/add-patient" element={
-                  <ProtectedRoute allowedRoles={['user']}>
-                    <AddPatient />
-                  </ProtectedRoute>
-                } />
-                <Route path="/manage-patients" element={
-                  <ProtectedRoute allowedRoles={['user']}>
-                    <ManagePatients />
                   </ProtectedRoute>
                 } />
 

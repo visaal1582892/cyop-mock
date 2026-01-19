@@ -15,10 +15,10 @@ const UserProfile = () => {
         height: 175,
         weight: 75,
         activityLevel: "sedentary",
-        goal: "maintenance",
-        targetChange: 0,
+        targetWeightLoss: 0, // Simplified from goal/targetChange
         dietType: "veg",
-        cuisine: "North Indian"
+        cuisine: "North Indian",
+        planDuration: 3
     };
 
     const [formData, setFormData] = useState(initialForm);
@@ -37,7 +37,12 @@ const UserProfile = () => {
 
         if (savedData) {
             const parsed = JSON.parse(savedData);
-            setFormData(parsed); // This will trigger the calculation effect below
+            setFormData({
+                ...initialForm,
+                ...parsed, // Merge saved data
+                // Migrate old data if needed
+                targetWeightLoss: parsed.targetWeightLoss || parsed.targetChange || 0
+            });
         } else {
             // New profile or no data, reset to defaults or patient details if available
             if (selectedPatientId !== 'self') {
@@ -56,14 +61,15 @@ const UserProfile = () => {
         }
     }, [selectedPatientId]);
 
-    // Calculate stats and autosave
+    // Calculate stats and autosave immediately on change
     useEffect(() => {
         // Only calculate if valid
         if (Object.keys(validationErrors).length > 0) return;
 
         const bmr = calculateBMR(formData.weight, formData.height, formData.age, formData.gender);
         const tdee = calculateTDEE(formData.weight);
-        const targetCalories = calculateTargetCalories(tdee, formData.goal, formData.targetChange);
+        // Using updated logic: targetWeightLoss is typically positive for loss
+        const targetCalories = calculateTargetCalories(tdee, formData.targetWeightLoss);
         const macros = calculateMacros(targetCalories);
 
         setStats({ bmr, tdee, targetCalories, macros });
@@ -84,9 +90,6 @@ const UserProfile = () => {
         if (name === 'weight') {
             if (value < 20 || value > 300) error = "Weight must be 20-300 kg";
         }
-        if (name === 'targetChange') {
-            if (Math.abs(value) > 10) error = "Target change > 10kg/m is unsafe";
-        }
         return error;
     };
 
@@ -94,7 +97,7 @@ const UserProfile = () => {
         const { name, value } = e.target;
         let finalValue = value;
 
-        if (['age', 'height', 'weight', 'targetChange'].includes(name)) {
+        if (['age', 'height', 'weight', 'targetWeightLoss'].includes(name)) {
             finalValue = Number(value);
             const error = validate(name, finalValue);
 
@@ -113,163 +116,196 @@ const UserProfile = () => {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+            {/* Header - Simplified */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold text-gray-900">Profile & Goals</h2>
-                    <p className="text-gray-500 mt-2">Manage personalized nutritional roadmaps.</p>
-                </div>
-
-                {/* Patient Selector */}
-                <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-200 flex items-center gap-3">
-                    <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600">
-                        <Users size={20} />
-                    </div>
-                    <div className="flex-1">
-                        <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Planning for</p>
-                        <select
-                            value={selectedPatientId}
-                            onChange={(e) => setSelectedPatientId(e.target.value)}
-                            className="font-bold text-gray-800 bg-transparent outline-none cursor-pointer hover:text-emerald-600 transition-colors w-full min-w-[150px]"
-                        >
-                            <option value="self">Myself ({user?.name})</option>
-                            {patients.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                    <h2 className="text-3xl font-bold text-gray-900">Patient Profile</h2>
+                    <p className="text-gray-500 mt-2">Manage physical attributes and calculate goals.</p>
                 </div>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-                {/* Input Section */}
-                <div className="lg:col-span-2 space-y-6 order-2 lg:order-1">
-                    <section className="bg-white p-4 lg:p-6 rounded-2xl shadow-sm border border-gray-100">
-                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4 text-gray-800">
-                            <UserIcon className="w-5 h-5 text-emerald-500" /> Personal Details
+                {/* Input Section - Refactored */}
+                <div className="lg:col-span-2 space-y-6">
+                    <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-6 text-gray-800">
+                            <Activity className="w-5 h-5 text-emerald-500" /> Physical Attributes
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <InputGroup label="Name" name="name" value={formData.name} onChange={handleChange} />
+
+                        {/* Name Select - "Long Field" */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Name / Profile Selection</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedPatientId}
+                                    onChange={(e) => setSelectedPatientId(e.target.value)}
+                                    className="w-full p-4 pl-12 rounded-xl border border-gray-200 bg-gray-50 hover:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-lg font-bold text-gray-800 appearance-none cursor-pointer shadow-sm"
+                                >
+                                    <option value="self">Myself ({user?.name})</option>
+                                    {patients.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name} ({p.relationship})</option>
+                                    ))}
+                                </select>
+                                <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={20} />
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Top Priority Editable Inputs: Height, Weight, Age, Activity */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <InputGroup
+                                label="Height (cm)"
+                                type="number"
+                                name="height"
+                                value={formData.height}
+                                onChange={handleChange}
+                                error={validationErrors.height}
+                                className="text-lg font-semibold"
+                            />
+                            <InputGroup
+                                label="Weight (kg)"
+                                type="number"
+                                name="weight"
+                                value={formData.weight}
+                                onChange={handleChange}
+                                error={validationErrors.weight}
+                                className="text-lg font-semibold"
+                            />
+                            <InputGroup
+                                label="Age"
+                                type="number"
+                                name="age"
+                                value={formData.age}
+                                onChange={handleChange}
+                                error={validationErrors.age}
+                                className="text-lg font-semibold"
+                            />
                             <div className="form-group">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-                                <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none bg-gray-50">
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Activity Level</label>
+                                <select
+                                    name="activityLevel"
+                                    value={formData.activityLevel}
+                                    onChange={handleChange}
+                                    className="w-full p-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50 text-base font-medium"
+                                >
+                                    <option value="sedentary">Sedentary (Little/No Exercise)</option>
+                                    <option value="light">Lightly Active (1-3 days)</option>
+                                    <option value="moderate">Moderately Active (3-5 days)</option>
+                                    <option value="active">Very Active (6-7 days)</option>
+                                    <option value="veryActive">Super Active (Physical Job)</option>
                                 </select>
                             </div>
-                            <InputGroup label="Age (years)" type="number" name="age" value={formData.age} onChange={handleChange} error={validationErrors.age} />
-                            <InputGroup label="Height (cm)" type="number" name="height" value={formData.height} onChange={handleChange} error={validationErrors.height} />
-                            <InputGroup label="Weight (kg)" type="number" name="weight" value={formData.weight} onChange={handleChange} error={validationErrors.weight} />
-                            <div className="form-group md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Activity Level</label>
-                                <select name="activityLevel" value={formData.activityLevel} onChange={handleChange} className="w-full p-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none bg-gray-50">
-                                    <option value="sedentary">Sedentary (Little or no exercise)</option>
-                                    <option value="light">Lightly Active (1-3 days/week)</option>
-                                    <option value="moderate">Moderately Active (3-5 days/week)</option>
-                                    <option value="active">Very Active (6-7 days/week)</option>
-                                    <option value="veryActive">Super Active (Physical job/training)</option>
-                                </select>
+                        </div>
+
+                        {/* Read-only / Less emphasized fields */}
+                        <div className="grid grid-cols-1 gap-6 pt-4 mt-4 border-t border-gray-50">
+                            <div className="form-group">
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Gender (Auto-set)</label>
+                                <div className="w-full p-3 rounded-lg border border-gray-100 bg-gray-100 text-gray-500 capitalize">
+                                    {formData.gender}
+                                </div>
                             </div>
                         </div>
                     </section>
 
-                    <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4 text-gray-800">
-                            <Target className="w-5 h-5 text-blue-500" /> Goals & Preferences
+                    <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative">
+                        <div className="absolute top-0 left-0 w-2 h-full bg-blue-500"></div>
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-6 text-gray-800">
+                            <Target className="w-5 h-5 text-blue-500" /> Goal & Preferences
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Single Target Weight Loss Field */}
                             <div className="form-group md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Goal</label>
-                                <div className="flex gap-4 p-1 bg-gray-50 rounded-lg inline-flex">
-                                    {['loss', 'maintenance', 'gain'].map(g => (
-                                        <button
-                                            key={g}
-                                            onClick={() => handleChange({ target: { name: 'goal', value: g } })}
-                                            className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all ${formData.goal === g
-                                                ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-gray-200'
-                                                : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                        >
-                                            {g === 'loss' ? 'Weight Loss' : g === 'gain' ? 'Muscle Gain' : 'Maintenance'}
-                                        </button>
-                                    ))}
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-gray-700">Target Weight Loss (kg)</label>
+                                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Leave 0 for Maintenance</span>
                                 </div>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        name="targetWeightLoss"
+                                        value={formData.targetWeightLoss}
+                                        onChange={handleChange}
+                                        className="w-full p-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-lg font-bold text-gray-800"
+                                        placeholder="e.g. 2"
+                                    />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">kg/month</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    Entering a target here will automatically adjust your daily calorie budget to create a safe deficit.
+                                </p>
                             </div>
 
-                            {formData.goal !== 'maintenance' && (
-                                <InputGroup
-                                    label={`Target Change (kg/month) +/-`}
-                                    type="number"
-                                    name="targetChange"
-                                    value={formData.targetChange}
-                                    onChange={handleChange}
-                                    subtext="Recommended: 2kg/month"
-                                    error={validationErrors.targetChange}
-                                />
-                            )}
-
                             <div className="form-group">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Diet Type</label>
-                                <select name="dietType" value={formData.dietType} onChange={handleChange} className="w-full p-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none bg-gray-50">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Diet Style</label>
+                                <select name="dietType" value={formData.dietType} onChange={handleChange} className="w-full p-2.5 rounded-lg border border-gray-200 bg-gray-50">
                                     <option value="veg">Vegetarian</option>
                                     <option value="non-veg">Non-Vegetarian</option>
-                                    <option value="eggitarian">Eggitarian</option>
+                                    <option value="eggitarian">Eggetarian</option>
                                 </select>
                             </div>
 
                             <div className="form-group">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Cuisine Preference</label>
-                                <select name="cuisine" value={formData.cuisine} onChange={handleChange} className="w-full p-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none bg-gray-50">
+                                <select name="cuisine" value={formData.cuisine} onChange={handleChange} className="w-full p-2.5 rounded-lg border border-gray-200 bg-gray-50">
                                     <option value="North Indian">North Indian</option>
                                     <option value="South Indian">South Indian</option>
-                                    <option value="East Indian">East Indian</option>
-                                    <option value="West Indian">West Indian</option>
-                                    <option value="Global">Global / Continental</option>
+                                    <option value="International">International</option>
                                     <option value="Mixed">Mixed</option>
                                 </select>
+                            </div>
+
+                            <div className="form-group md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Plan Duration</label>
+                                <div className="flex gap-4">
+                                    {[1, 3, 7].map(d => (
+                                        <button
+                                            key={d}
+                                            onClick={() => handleChange({ target: { name: 'planDuration', value: d } })}
+                                            className={`flex-1 py-2 rounded-lg border font-medium transition-all ${formData.planDuration === d
+                                                ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
+                                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            {d} Day{d > 1 ? 's' : ''}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    {formData.planDuration === 3 ? "Recommended for consistency. Repeat twice for a full week." : ""}
+                                </p>
                             </div>
                         </div>
                     </section>
                 </div>
 
                 {/* Results Section */}
-                <div className="lg:col-span-1 order-1 lg:order-2">
-                    <div className="relative lg:sticky lg:top-6 space-y-6">
-                        <div className={`bg-emerald-600 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden transition-colors ${Object.keys(validationErrors).length > 0 ? 'grayscale opacity-75' : ''}`}>
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+                <div className="lg:col-span-1">
+                    <div className="sticky top-6 space-y-6">
+                        <div className={`bg-gray-900 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden transition-all duration-300 ${Object.keys(validationErrors).length > 0 ? 'grayscale opacity-75' : ''}`}>
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/20 rounded-full -mr-10 -mt-10 blur-3xl"></div>
                             <div className="relative z-10">
-                                <p className="text-emerald-100 font-medium text-sm uppercase tracking-wide">Daily Target</p>
-                                <h2 className="text-5xl font-bold mt-2">{stats.targetCalories}</h2>
-                                <span className="text-xl text-emerald-200">kcal</span>
+                                <p className="text-gray-400 font-medium text-sm uppercase tracking-wide">Daily Target</p>
+                                <h2 className="text-6xl font-bold mt-2 tracking-tight">{stats.targetCalories}</h2>
+                                <span className="text-xl text-gray-500">kcal</span>
 
-                                <div className="mt-6 pt-6 border-t border-emerald-500/30 grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-emerald-200 text-xs">Maintenance</p>
-                                        <p className="font-semibold text-lg">{stats.tdee} kcal</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-emerald-200 text-xs">BMR</p>
-                                        <p className="font-semibold text-lg">{Math.round(stats.bmr)} kcal</p>
+                                <div className="mt-8 pt-6 border-t border-gray-800 grid grid-cols-2 gap-6">
+                                    <div className="col-span-2 text-center">
+                                        <p className="text-gray-400 text-xs mb-1">Maintenance (TDEE)</p>
+                                        <p className="font-semibold text-xl">{stats.tdee} <span className="text-xs font-normal text-gray-600">kcal</span></p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {Object.keys(validationErrors).length > 0 && (
-                            <div className="bg-red-50 border border-red-100 p-4 rounded-xl flex gap-3 text-red-700 text-sm">
-                                <AlertCircle size={20} className="shrink-0" />
-                                <div>
-                                    <p className="font-bold">Errors in inputs:</p>
-                                    <ul className="list-disc pl-4 mt-1">
-                                        {Object.values(validationErrors).map((e, i) => <li key={i}>{e}</li>)}
-                                    </ul>
-                                </div>
-                            </div>
-                        )}
-
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                             <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center gap-2">
-                                <Utensils className="w-5 h-5 text-orange-500" /> Macronutrient Split
+                                <Utensils className="w-5 h-5 text-orange-500" /> Macronutrients
                             </h3>
                             <MacroDonut macros={stats.macros} total={stats.targetCalories} />
                         </div>
@@ -280,7 +316,7 @@ const UserProfile = () => {
     );
 };
 
-const InputGroup = ({ label, subtext, error, ...props }) => (
+const InputGroup = ({ label, subtext, error, className, ...props }) => (
     <div className="form-group relative">
         <label className="block text-sm font-medium text-gray-700 mb-1">
             {label}
@@ -291,7 +327,7 @@ const InputGroup = ({ label, subtext, error, ...props }) => (
             className={`w-full p-2.5 rounded-lg border focus:ring-2 focus:border-transparent outline-none transition-all font-medium ${error
                 ? 'border-red-300 bg-red-50 focus:ring-red-500 text-red-900'
                 : 'border-gray-200 bg-gray-50 focus:ring-emerald-500'
-                }`}
+                } ${className}`}
         />
         {error && <span className="text-xs text-red-500 absolute -bottom-4 left-1">{error}</span>}
     </div>
@@ -375,9 +411,5 @@ const MacroDonut = ({ macros, total }) => {
         </div>
     )
 }
-
-const UserIcon = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-)
 
 export default UserProfile;

@@ -141,49 +141,52 @@ const Admin = () => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-                    <div className="p-4 bg-blue-100 text-blue-600 rounded-xl">
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-50 text-blue-600 rounded-2xl shadow-inner">
                         <Users size={24} />
                     </div>
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">Total Users</p>
-                        <h3 className="text-2xl font-bold text-gray-900">1,234</h3>
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Total Users</p>
+                        <h3 className="text-3xl font-bold text-gray-900">1,234</h3>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-                    <div className="p-4 bg-emerald-100 text-emerald-600 rounded-xl">
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-4 bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-600 rounded-2xl shadow-inner">
                         <Activity size={24} />
                     </div>
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">Active Plans</p>
-                        <h3 className="text-2xl font-bold text-gray-900">892</h3>
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Active Plans</p>
+                        <h3 className="text-3xl font-bold text-gray-900">892</h3>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-                    <div className="p-4 bg-purple-100 text-purple-600 rounded-xl">
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-600 rounded-2xl shadow-inner">
                         <Shield size={24} />
                     </div>
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">System Status</p>
-                        <h3 className="text-2xl font-bold text-gray-900">Healthy</h3>
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">System Status</p>
+                        <h3 className="text-3xl font-bold text-gray-900">Healthy</h3>
                     </div>
                 </div>
             </div>
 
             {/* Bulk Upload Section */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 text-center max-w-4xl mx-auto">
-                <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600">
+            <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 p-8 text-center max-w-4xl mx-auto relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+
+                <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-6 text-emerald-600 shadow-sm rotate-3 transform transition-transform hover:rotate-6">
                     <Upload size={32} />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Bulk Food Upload</h3>
-                <p className="text-gray-500 mb-8 max-w-md mx-auto">
-                    Upload an Excel/CSV file to update the master food database. Ensure headers match the template.
+                <h3 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Bulk Food Upload</h3>
+                <p className="text-gray-500 mb-8 max-w-md mx-auto leading-relaxed">
+                    Expand your food database by uploading Excel or CSV files. <br />
+                    <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-2 inline-block">Supports .xlsx, .csv</span>
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <label className={`cursor-pointer bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-all flex items-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <label className={`cursor-pointer bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-gray-800 hover:scale-105 transition-all flex items-center gap-3 shadow-lg ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                         <FileText size={20} />
-                        {uploading ? 'Uploading...' : 'Select CSV/Excel File'}
+                        {uploading ? 'Uploading...' : 'Select Data File'}
                         <input
                             type="file"
                             accept=".csv, .xlsx, .xls"
@@ -195,7 +198,7 @@ const Admin = () => {
 
                     <button
                         onClick={downloadTemplate}
-                        className="px-6 py-3 rounded-xl font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-all flex items-center gap-2"
+                        className="px-8 py-4 rounded-2xl font-bold text-gray-600 border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-all flex items-center gap-3"
                     >
                         <Download size={20} />
                         Download Template
@@ -203,29 +206,31 @@ const Admin = () => {
                 </div>
 
                 {/* Data Preview / Instructions Table */}
-                <div className="mt-12 text-left bg-gray-50 rounded-xl p-6 border border-gray-100">
-                    <div className="flex justify-between items-center mb-4">
-                        <h4 className="font-bold text-gray-900 flex items-center gap-2">
-                            <FileText size={18} />
+                <div className="mt-12 text-left bg-gray-50/50 rounded-3xl p-8 border border-gray-100">
+                    <div className="flex justify-between items-center mb-6">
+                        <h4 className="font-bold text-gray-900 flex items-center gap-3 text-lg">
+                            <div className="p-2 bg-white rounded-lg shadow-sm text-emerald-600">
+                                <FileText size={18} />
+                            </div>
                             {uploadedData.length > 0 ? `Uploaded Data (${uploadedData.length} items)` : 'Required Headers Template'}
                         </h4>
 
                         {uploadedData.length > 0 && (
-                            <div className="flex items-center gap-2 text-sm">
+                            <div className="flex items-center gap-2 text-sm bg-white p-1 rounded-xl shadow-sm border border-gray-100">
                                 <button
                                     onClick={handlePrevPage}
                                     disabled={currentPage === 1}
-                                    className="px-2 py-1 text-gray-500 hover:bg-gray-200 rounded disabled:opacity-50"
+                                    className="px-3 py-1.5 text-gray-500 hover:bg-gray-50 rounded-lg disabled:opacity-30 font-medium transition-colors"
                                 >
                                     Prev
                                 </button>
-                                <span className="text-gray-600 font-medium">
-                                    Page {currentPage} of {totalPages}
+                                <span className="text-gray-800 font-bold px-2">
+                                    {currentPage} <span className="text-gray-300 font-normal">/</span> {totalPages}
                                 </span>
                                 <button
                                     onClick={handleNextPage}
                                     disabled={currentPage === totalPages}
-                                    className="px-2 py-1 text-gray-500 hover:bg-gray-200 rounded disabled:opacity-50"
+                                    className="px-3 py-1.5 text-gray-500 hover:bg-gray-50 rounded-lg disabled:opacity-30 font-medium transition-colors"
                                 >
                                     Next
                                 </button>
@@ -233,41 +238,45 @@ const Admin = () => {
                         )}
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white">
                         <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-gray-500 uppercase bg-gray-100">
+                            <thead className="text-xs text-gray-500 uppercase bg-gray-50/80 border-b border-gray-100">
                                 <tr>
-                                    <th className="px-4 py-3 rounded-l-lg">Food Item</th>
-                                    <th className="px-4 py-3">Serving Size</th>
-                                    <th className="px-4 py-3">Calories</th>
-                                    <th className="px-4 py-3">Protein</th>
-                                    <th className="px-4 py-3">Carbs</th>
-                                    <th className="px-4 py-3">Fats</th>
-                                    <th className="px-4 py-3 rounded-r-lg">Category</th>
+                                    <th className="px-6 py-4 font-bold tracking-wider">Food Item</th>
+                                    <th className="px-6 py-4 font-bold tracking-wider">Serving</th>
+                                    <th className="px-6 py-4 font-bold tracking-wider">Kcal</th>
+                                    <th className="px-6 py-4 font-bold tracking-wider">Pro</th>
+                                    <th className="px-6 py-4 font-bold tracking-wider">Carb</th>
+                                    <th className="px-6 py-4 font-bold tracking-wider">Fat</th>
+                                    <th className="px-6 py-4 font-bold tracking-wider">Category</th>
                                 </tr>
                             </thead>
-                            <tbody className="text-gray-600">
+                            <tbody className="text-gray-600 divide-y divide-gray-50">
                                 {uploadedData.length > 0 ? (
                                     paginatedData.map((row, index) => (
-                                        <tr key={index} className="border-b border-gray-100 hover:bg-white transition-colors">
-                                            <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
-                                            <td className="px-4 py-3">{row.servingSize}</td>
-                                            <td className="px-4 py-3">{row.calories}</td>
-                                            <td className="px-4 py-3">{row.protein}</td>
-                                            <td className="px-4 py-3">{row.carbs}</td>
-                                            <td className="px-4 py-3">{row.fats}</td>
-                                            <td className="px-4 py-3">{row.category}</td>
+                                        <tr key={index} className="hover:bg-emerald-50/30 transition-colors group">
+                                            <td className="px-6 py-4 font-bold text-gray-900 group-hover:text-emerald-700">{row.name}</td>
+                                            <td className="px-6 py-4">{row.servingSize}</td>
+                                            <td className="px-6 py-4 font-medium text-gray-900">{row.calories}</td>
+                                            <td className="px-6 py-4">{row.protein}</td>
+                                            <td className="px-6 py-4">{row.carbs}</td>
+                                            <td className="px-6 py-4">{row.fats}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-600">{row.category}</span>
+                                            </td>
                                         </tr>
                                     ))
                                 ) : (
-                                    <tr className="border-b border-gray-100">
-                                        <td className="px-4 py-3 font-medium text-gray-900">Oats</td>
-                                        <td className="px-4 py-3">100g</td>
-                                        <td className="px-4 py-3">389</td>
-                                        <td className="px-4 py-3">16.9</td>
-                                        <td className="px-4 py-3">66.3</td>
-                                        <td className="px-4 py-3">6.9</td>
-                                        <td className="px-4 py-3">Grains</td>
+                                    <tr className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4 font-bold text-gray-900">Oats</td>
+                                        <td className="px-6 py-4">100g</td>
+                                        <td className="px-6 py-4 font-medium text-gray-900">389</td>
+                                        <td className="px-6 py-4">16.9</td>
+                                        <td className="px-6 py-4">66.3</td>
+                                        <td className="px-6 py-4">6.9</td>
+                                        <td className="px-6 py-4">
+                                            <span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-600">Grains</span>
+                                        </td>
                                     </tr>
                                 )}
                             </tbody>
