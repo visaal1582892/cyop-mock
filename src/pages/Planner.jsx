@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, RotateCcw, Save, Flame, RefreshCw } from 'lucide-react';
-import { foodDatabase } from '../data/foodDatabase';
+import { Plus, Search, Trash2, RotateCcw, Save, Flame, RefreshCw, Users, X } from 'lucide-react';
 import { calculateMealTargets, calculateSmartPortion, findSwaps } from '../utils/calculations';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 const Planner = () => {
-    const [meals, setMeals] = useState(() => {
-        const saved = localStorage.getItem('cyop_meals');
-        return saved ? JSON.parse(saved) : {
-            breakfast: [],
-            lunch: [],
-            dinner: [],
-            snacks: []
-        };
+    const { selectedPatientId, patients, user, foodDatabase } = useAuth(); // Get context
+
+    // Helper to get display name
+    const getPatientName = () => {
+        if (selectedPatientId === 'self') return user?.name || 'Myself';
+        const p = patients.find(p => p.id === selectedPatientId);
+        return p?.name || 'Unknown Patient';
+    };
+
+    const [meals, setMeals] = useState({
+        breakfast: [],
+        lunch: [],
+        dinner: [],
+        snacks: []
     });
 
     const [userStats, setUserStats] = useState({ targetCalories: 2000, goal: 'maintenance' });
@@ -23,21 +29,36 @@ const Planner = () => {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [swapCandidates, setSwapCandidates] = useState(null);
 
+    // Load data when selectedPatientId changes
     useEffect(() => {
-        const savedStats = localStorage.getItem('userStats');
+        // 1. Load Meals
+        const mealKey = `meals_${selectedPatientId}`;
+        const savedMeals = localStorage.getItem(mealKey);
+        if (savedMeals) {
+            setMeals(JSON.parse(savedMeals));
+        } else {
+            setMeals({ breakfast: [], lunch: [], dinner: [], snacks: [] });
+        }
+
+        // 2. Load Stats (Targets)
+        const statsKey = `userStats_${selectedPatientId}`;
+        const savedStats = localStorage.getItem(statsKey);
         if (savedStats) {
             const parsed = JSON.parse(savedStats);
             setUserStats(parsed);
             setMealTargets(calculateMealTargets(parsed.targetCalories, parsed.goal));
         } else {
-            // Default
+            // Default fallbacks if no profile set yet
+            setUserStats({ targetCalories: 2000, goal: 'maintenance' });
             setMealTargets(calculateMealTargets(2000, 'maintenance'));
         }
-    }, []);
+    }, [selectedPatientId]);
 
+    // Save meals when they change
     useEffect(() => {
-        localStorage.setItem('cyop_meals', JSON.stringify(meals));
-    }, [meals]);
+        const mealKey = `meals_${selectedPatientId}`;
+        localStorage.setItem(mealKey, JSON.stringify(meals));
+    }, [meals, selectedPatientId]);
 
     // Calculations
     const getMealTotal = (mealType) => {
@@ -178,8 +199,12 @@ const Planner = () => {
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
 
             {/* Header */}
-            <header className="flex justify-between items-end">
+            <header className="flex flex-col md:flex-row justify-between items-end gap-4">
                 <div>
+                    <div className="flex items-center gap-2 text-sm text-emerald-600 font-medium mb-1">
+                        <Users size={16} />
+                        <span>Planning for: {getPatientName()}</span>
+                    </div>
                     <h2 className="text-3xl font-bold text-gray-900">Daily Meal Planner</h2>
                     <p className="text-gray-500">Design your plate, hit your meal targets.</p>
                 </div>
@@ -204,22 +229,29 @@ const Planner = () => {
 
             {/* Search Modal */}
             {isSearchOpen && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-                        <div className="p-4 border-b border-gray-100 flex gap-3 items-center">
-                            <Search className="text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder={`Search food for ${activeMealSlot}...`}
-                                className="flex-1 outline-none text-lg"
-                                autoFocus
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                            <button onClick={() => setIsSearchOpen(false)} className="text-gray-400 hover:text-gray-600">Esc</button>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4">
+                    <div className="bg-white w-full h-[90vh] md:h-[600px] md:max-w-lg md:rounded-2xl shadow-2xl overflow-hidden flex flex-col rounded-t-2xl animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-gray-100 flex gap-3 items-center shrink-0 justify-between">
+                            <div className="flex gap-3 items-center flex-1">
+                                <Search className="text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder={`Search food for ${activeMealSlot}...`}
+                                    className="flex-1 outline-none text-lg"
+                                    autoFocus
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                onClick={() => setIsSearchOpen(false)}
+                                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
                         </div>
 
-                        <div className="overflow-y-auto p-2 space-y-1">
+                        <div className="overflow-y-auto p-2 space-y-1 flex-1">
                             {searchResults.map((item) => {
                                 // Smart Suggestion Logic
                                 const currentMealCal = getMealTotal(activeMealSlot);
@@ -232,7 +264,7 @@ const Planner = () => {
                                 }
 
                                 return (
-                                    <div key={item.id} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl group">
+                                    <div key={item.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-3 hover:bg-gray-50 rounded-xl group gap-3">
                                         <div>
                                             <div className="font-semibold text-gray-800">{item.name}</div>
                                             <div className="text-xs text-gray-500">
@@ -245,20 +277,20 @@ const Planner = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 self-end sm:self-auto">
                                             {smartAmount > 10 && (
                                                 <button
                                                     onClick={() => addFood(item, smartAmount)}
-                                                    className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-200 transition-colors"
+                                                    className="px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-200 transition-colors"
                                                 >
                                                     Add {smartAmount}g
                                                 </button>
                                             )}
                                             <button
                                                 onClick={() => addFood(item)}
-                                                className="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors"
+                                                className="px-3 py-2 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors"
                                             >
-                                                Add Default
+                                                Add
                                             </button>
                                         </div>
                                     </div>
@@ -271,8 +303,8 @@ const Planner = () => {
 
             {/* Swap Modal */}
             {swapCandidates && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50 md:p-4">
+                    <div className="bg-white w-full rounded-t-2xl md:rounded-2xl shadow-2xl md:max-w-md overflow-hidden animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95 duration-200">
                         <div className="p-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
                             <h3 className="text-xl font-bold">Swap {swapCandidates.originalItem.name}</h3>
                             <p className="text-emerald-100 text-sm mt-1">Select an alternative to maintain similar calorie intake.</p>
@@ -285,7 +317,7 @@ const Planner = () => {
                                     <button
                                         key={cand.id}
                                         onClick={() => applySwap(cand)}
-                                        className="w-full p-4 hover:bg-gray-50 border-b border-gray-50 last:border-none text-left flex justify-between items-center group"
+                                        className="w-full p-4 hover:bg-gray-50 border-b border-gray-50 last:border-none text-left flex justify-between items-center group active:bg-gray-100 transition-colors"
                                     >
                                         <div>
                                             <p className="font-bold text-gray-800">{cand.name}</p>
@@ -302,8 +334,8 @@ const Planner = () => {
                                 ))
                             )}
                         </div>
-                        <div className="p-4 bg-gray-50 border-t border-gray-100 text-right">
-                            <button onClick={() => setSwapCandidates(null)} className="text-gray-500 font-medium hover:text-gray-700">Cancel</button>
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 text-right safe-area-bottom">
+                            <button onClick={() => setSwapCandidates(null)} className="text-gray-500 font-medium hover:text-gray-700 w-full md:w-auto py-2">Cancel</button>
                         </div>
                     </div>
                 </div>

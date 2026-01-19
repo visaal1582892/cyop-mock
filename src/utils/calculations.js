@@ -8,42 +8,36 @@ export const calculateBMR = (weight, height, age, gender) => {
     }
 };
 
-// Total Daily Energy Expenditure (TDEE)
-export const calculateTDEE = (bmr, activityLevel) => {
-    const multipliers = {
-        sedentary: 1.2,
-        light: 1.375,
-        moderate: 1.55,
-        active: 1.725,
-        veryActive: 1.9,
-    };
-    return Math.round(bmr * (multipliers[activityLevel] || 1.2));
+// Maintenance Calories (TDEE) using user specified formula: Weight * 2.2 * 12
+export const calculateTDEE = (weight) => {
+    return Math.round(weight * 2.2 * 12);
 };
 
-export const calculateTargetCalories = (tdee, goal, targetChangeKg = 0) => {
+export const calculateTargetCalories = (maintenance, goal, targetChangeKg = 0) => {
     // 1kg fat approx 7700 calories. 
     // Target change per month -> daily deficit/surplus. 
     // e.g. 2kg/month = 2 * 7700 / 30 = ~513 cal/day
 
-    // Default standard deficits/surplus:
+    // Formula: Maintenance +/- (TargetWeight * 7700 / 30)
+
     let adjustment = 0;
 
     if (goal === 'loss') {
-        adjustment = targetChangeKg ? -((targetChangeKg * 7700) / 30) : -500;
+        adjustment = -((targetChangeKg * 7700) / 30);
     } else if (goal === 'gain') {
-        adjustment = targetChangeKg ? ((targetChangeKg * 7700) / 30) : 500;
+        adjustment = ((targetChangeKg * 7700) / 30);
     }
 
-    return Math.round(tdee + adjustment);
+    return Math.round(maintenance + adjustment);
 };
 
 export const calculateMacros = (calories) => {
-    // Standard balanced diet: 30% Protein, 40% Carbs, 30% Fats
+    // User requested split: 30% Protein, 45% Carbs, 25% Fats
     // 1g Protein = 4 cal, 1g Carb = 4 cal, 1g Fat = 9 cal
     return {
         protein: Math.round((calories * 0.30) / 4),
-        carbs: Math.round((calories * 0.40) / 4),
-        fats: Math.round((calories * 0.30) / 9),
+        carbs: Math.round((calories * 0.45) / 4),
+        fats: Math.round((calories * 0.25) / 9),
     };
 };
 
