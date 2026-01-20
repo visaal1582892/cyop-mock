@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, User, List, Settings, LogOut, UserPlus } from 'lucide-react';
+import { LayoutDashboard, User, List, Settings, LogOut, UserPlus, FolderHeart, Utensils } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const AppLayout = ({ children }) => {
@@ -34,8 +34,9 @@ const AppLayout = ({ children }) => {
                 <nav className="flex-1 p-4 space-y-2">
                     {user.role === 'user' && (
                         <>
-                            <NavItem to="/" icon={<User size={20} />} label="Profile & Goals" />
-                            <NavItem to="/planner" icon={<LayoutDashboard size={20} />} label="Meal Planner" />
+                            <NavItem to="/" icon={<User size={20} />} label="Profile" />
+                            <NavItem to="/planner" icon={<Utensils size={20} />} label="Meal Planner" />
+                            <NavItem to="/saved-plans" icon={<FolderHeart size={20} />} label="Saved Plans" />
                         </>
                     )}
                     {user.role === 'admin' && (
@@ -78,7 +79,8 @@ const AppLayout = ({ children }) => {
                 {user.role === 'user' ? (
                     <>
                         <MobileNavItem to="/" icon={<User size={22} />} label="Profile" />
-                        <MobileNavItem to="/planner" icon={<LayoutDashboard size={22} />} label="Planner" />
+                        <MobileNavItem to="/planner" icon={<Utensils size={22} />} label="Planner" />
+                        <MobileNavItem to="/saved-plans" icon={<FolderHeart size={22} />} label="Plans" />
                     </>
                 ) : (
                     <MobileNavItem to="/admin" icon={<Settings size={22} />} label="Admin" />

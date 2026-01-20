@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import AppLayout from './components/layout/AppLayout';
 import UserProfile from './pages/UserProfile';
 import Planner from './pages/Planner';
+import SavedPlans from './pages/SavedPlans';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -49,6 +50,11 @@ function App() {
                 <Route path="/admin" element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Admin />
+                  </ProtectedRoute>
+                } />
+                <Route path="/saved-plans" element={
+                  <ProtectedRoute allowedRoles={['user']}>
+                    <SavedPlans />
                   </ProtectedRoute>
                 } />
               </Routes>

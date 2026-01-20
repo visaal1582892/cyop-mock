@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { calculateBMR, calculateTDEE, calculateTargetCalories, calculateMacros } from '../utils/calculations';
-import { Activity, Target, Utensils, AlertCircle, Users } from 'lucide-react';
+import { Activity, Target, Utensils, AlertCircle, Users, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 const UserProfile = () => {
     const { user, patients, selectedPatientId, setSelectedPatientId } = useAuth();
+    const navigate = useNavigate();
 
     // Default form data structure
     const initialForm = {
@@ -14,20 +16,14 @@ const UserProfile = () => {
         gender: "male",
         height: 175,
         weight: 75,
-        activityLevel: "sedentary",
-        targetWeightLoss: 0, // Simplified from goal/targetChange
-        dietType: "veg",
-        cuisine: "North Indian",
-        planDuration: 3
+        activityLevel: "sedentary"
     };
 
     const [formData, setFormData] = useState(initialForm);
     const [validationErrors, setValidationErrors] = useState({});
     const [stats, setStats] = useState({
         bmr: 0,
-        tdee: 0,
-        targetCalories: 0,
-        macros: { protein: 0, carbs: 0, fats: 0 }
+        tdee: 0
     });
 
     // Load data when selectedPatientId changes
@@ -39,9 +35,7 @@ const UserProfile = () => {
             const parsed = JSON.parse(savedData);
             setFormData({
                 ...initialForm,
-                ...parsed, // Merge saved data
-                // Migrate old data if needed
-                targetWeightLoss: parsed.targetWeightLoss || parsed.targetChange || 0
+                ...parsed, // Merge saved data (might include old goal data, which is fine to ignore)
             });
         } else {
             // New profile or no data, reset to defaults or patient details if available
@@ -61,23 +55,28 @@ const UserProfile = () => {
         }
     }, [selectedPatientId]);
 
-    // Calculate stats and autosave immediately on change
+    // Calculate stats live
     useEffect(() => {
-        // Only calculate if valid
         if (Object.keys(validationErrors).length > 0) return;
 
         const bmr = calculateBMR(formData.weight, formData.height, formData.age, formData.gender);
         const tdee = calculateTDEE(formData.weight);
-        // Using updated logic: targetWeightLoss is typically positive for loss
-        const targetCalories = calculateTargetCalories(tdee, formData.targetWeightLoss);
-        const macros = calculateMacros(targetCalories);
+        setStats({ bmr, tdee });
 
-        setStats({ bmr, tdee, targetCalories, macros });
+    }, [formData, validationErrors]);
 
-        // Persist to specific key
+    const saveProfile = () => {
         const storageKey = `userStats_${selectedPatientId}`;
-        localStorage.setItem(storageKey, JSON.stringify({ ...formData, ...stats, targetCalories }));
-    }, [formData, validationErrors, selectedPatientId]);
+        // Preserve existing data (like goals/prefs set in Planner) if possible, or just overwrite?
+        // Safer to read existing again or just spread current formData.
+        // Wait, we want to save PHYSICAL stats here.
+        // If we overwrite, we might lose prefs set in planner if they are stored in same key `userStats_${selectedPatientId}`.
+        // Yes, they are stored in `userStats`. We should merge.
+        const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        const updated = { ...existing, ...formData, ...stats };
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        toast.success("Profile Updated!");
+    };
 
     const validate = (name, value) => {
         let error = null;
@@ -97,7 +96,7 @@ const UserProfile = () => {
         const { name, value } = e.target;
         let finalValue = value;
 
-        if (['age', 'height', 'weight', 'targetWeightLoss'].includes(name)) {
+        if (['age', 'height', 'weight'].includes(name)) {
             finalValue = Number(value);
             const error = validate(name, finalValue);
 
@@ -121,7 +120,7 @@ const UserProfile = () => {
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-gray-900">Patient Profile</h2>
-                    <p className="text-gray-500 mt-2">Manage physical attributes and calculate goals.</p>
+                    <p className="text-gray-500 mt-2">Manage physical attributes and metrics.</p>
                 </div>
             </header>
 
@@ -201,118 +200,67 @@ const UserProfile = () => {
                             </div>
                         </div>
 
-                        {/* Read-only / Less emphasized fields */}
-                        <div className="grid grid-cols-1 gap-6 pt-4 mt-4 border-t border-gray-50">
+                        {/* More Editable Inputs */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 mt-4 border-t border-gray-50">
                             <div className="form-group">
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Gender (Auto-set)</label>
-                                <div className="w-full p-3 rounded-lg border border-gray-100 bg-gray-100 text-gray-500 capitalize">
-                                    {formData.gender}
-                                </div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                                <select
+                                    name="gender"
+                                    value={formData.gender}
+                                    onChange={handleChange}
+                                    className="w-full p-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50 text-base font-medium capitalize"
+                                >
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                </select>
                             </div>
                         </div>
-                    </section>
 
-                    <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative">
-                        <div className="absolute top-0 left-0 w-2 h-full bg-blue-500"></div>
-                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-6 text-gray-800">
-                            <Target className="w-5 h-5 text-blue-500" /> Goal & Preferences
-                        </h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Single Target Weight Loss Field */}
-                            <div className="form-group md:col-span-2">
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-gray-700">Target Weight Loss (kg)</label>
-                                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Leave 0 for Maintenance</span>
-                                </div>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        name="targetWeightLoss"
-                                        value={formData.targetWeightLoss}
-                                        onChange={handleChange}
-                                        className="w-full p-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-lg font-bold text-gray-800"
-                                        placeholder="e.g. 2"
-                                    />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">kg/month</span>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-2">
-                                    Entering a target here will automatically adjust your daily calorie budget to create a safe deficit.
-                                </p>
-                            </div>
-
-                            <div className="form-group">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Diet Style</label>
-                                <select name="dietType" value={formData.dietType} onChange={handleChange} className="w-full p-2.5 rounded-lg border border-gray-200 bg-gray-50">
-                                    <option value="veg">Vegetarian</option>
-                                    <option value="non-veg">Non-Vegetarian</option>
-                                    <option value="eggitarian">Eggetarian</option>
-                                </select>
-                            </div>
-
-                            <div className="form-group">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cuisine Preference</label>
-                                <select name="cuisine" value={formData.cuisine} onChange={handleChange} className="w-full p-2.5 rounded-lg border border-gray-200 bg-gray-50">
-                                    <option value="North Indian">North Indian</option>
-                                    <option value="South Indian">South Indian</option>
-                                    <option value="International">International</option>
-                                    <option value="Mixed">Mixed</option>
-                                </select>
-                            </div>
-
-                            <div className="form-group md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Plan Duration</label>
-                                <div className="flex gap-4">
-                                    {[1, 3, 7].map(d => (
-                                        <button
-                                            key={d}
-                                            onClick={() => handleChange({ target: { name: 'planDuration', value: d } })}
-                                            className={`flex-1 py-2 rounded-lg border font-medium transition-all ${formData.planDuration === d
-                                                ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
-                                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                                                }`}
-                                        >
-                                            {d} Day{d > 1 ? 's' : ''}
-                                        </button>
-                                    ))}
-                                </div>
-                                <p className="text-xs text-gray-500 mt-2">
-                                    {formData.planDuration === 3 ? "Recommended for consistency. Repeat twice for a full week." : ""}
-                                </p>
-                            </div>
+                        {/* Save Button */}
+                        <div className="flex justify-end pt-6 mt-4 border-t border-gray-50">
+                            <button
+                                onClick={saveProfile}
+                                className="bg-gray-900 text-white px-8 py-3 rounded-xl hover:bg-gray-800 transition-all font-bold shadow-lg shadow-gray-200 flex items-center gap-2"
+                            >
+                                <Users size={18} /> Save Details
+                            </button>
                         </div>
                     </section>
                 </div>
 
-                {/* Results Section */}
+                {/* Results Section - Simplified to just TDEE/BMR */}
                 <div className="lg:col-span-1">
                     <div className="sticky top-6 space-y-6">
                         <div className={`bg-gray-900 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden transition-all duration-300 ${Object.keys(validationErrors).length > 0 ? 'grayscale opacity-75' : ''}`}>
                             <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/20 rounded-full -mr-10 -mt-10 blur-3xl"></div>
                             <div className="relative z-10">
-                                <p className="text-gray-400 font-medium text-sm uppercase tracking-wide">Daily Target</p>
-                                <h2 className="text-6xl font-bold mt-2 tracking-tight">{stats.targetCalories}</h2>
-                                <span className="text-xl text-gray-500">kcal</span>
-
-                                <div className="mt-8 pt-6 border-t border-gray-800 grid grid-cols-2 gap-6">
-                                    <div className="col-span-2 text-center">
-                                        <p className="text-gray-400 text-xs mb-1">Maintenance (TDEE)</p>
-                                        <p className="font-semibold text-xl">{stats.tdee} <span className="text-xs font-normal text-gray-600">kcal</span></p>
-                                    </div>
-                                </div>
+                                <p className="text-gray-400 font-medium text-sm uppercase tracking-wide">Current Calorie Intake</p>
+                                <h2 className="text-6xl font-bold mt-2 tracking-tight">{stats.tdee}</h2>
+                                <span className="text-xl text-gray-500">kcal/day</span>
+                                <p className="text-xs text-gray-400 mt-2">Required to maintain current weight</p>
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                            <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center gap-2">
-                                <Utensils className="w-5 h-5 text-orange-500" /> Macronutrients
-                            </h3>
-                            <MacroDonut macros={stats.macros} total={stats.targetCalories} />
-                        </div>
+                        {/* Saved Plans Link Button */}
+                        <button
+                            onClick={() => navigate('/saved-plans')}
+                            className="w-full bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all group flex items-center justify-between"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="bg-emerald-50 p-3 rounded-xl text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                    <Users size={24} />
+                                </div>
+                                <div className="text-left">
+                                    <h3 className="font-bold text-gray-900">Saved Plans</h3>
+                                    <p className="text-xs text-gray-500">View archived plans</p>
+                                </div>
+                            </div>
+                            <ArrowRight className="text-gray-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+                        </button>
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

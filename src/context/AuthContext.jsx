@@ -73,7 +73,6 @@ export const AuthProvider = ({ children }) => {
             login,
             logout,
             patients,
-            patients,
             selectedPatientId,
             setSelectedPatientId,
             foodDatabase,
