@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { foodDatabase as staticFoodDatabase } from '../data/foodDatabase';
+import { userDatabase, mainUser } from '../data/userDatabase';
 
 const AuthContext = createContext(null);
 
@@ -9,12 +10,12 @@ export const AuthProvider = ({ children }) => {
         return saved ? JSON.parse(saved) : null;
     });
 
-    // Dummy Patients List
-    const [patients, setPatients] = useState([
-        { id: 'p1', name: 'John Doe', age: 45, gender: 'male', height: 180, weight: 85, relationship: 'Father' },
-        { id: 'p2', name: 'Jane Doe', age: 42, gender: 'female', height: 165, weight: 68, relationship: 'Mother' },
-        { id: 'p3', name: 'Kid Doe', age: 12, gender: 'male', height: 150, weight: 45, relationship: 'Son' }
-    ]);
+    // Persistent Patients List
+    const [patients, setPatients] = useState(() => {
+        const saved = localStorage.getItem('cyop_patients_v2');
+        if (saved) return JSON.parse(saved);
+        return userDatabase;
+    });
 
     // Currently selected patient ID (defaults to 'self' or user.id)
     const [selectedPatientId, setSelectedPatientId] = useState('self');
@@ -27,16 +28,21 @@ export const AuthProvider = ({ children }) => {
         }
     }, [user]);
 
-    // No longer persisting patients to local storage as they are static dummy data for now
+    // Persist patients
+    useEffect(() => {
+        localStorage.setItem('cyop_patients_v2', JSON.stringify(patients));
+    }, [patients]);
 
     const login = (role) => {
-        const dummyUser = {
-            id: role === 'admin' ? 'admin_1' : 'user_1',
-            name: role === 'admin' ? 'Admin User' : 'Rohit Sharma',
-            role: role,
-            email: role === 'admin' ? 'admin@cyop.com' : 'user@cyop.com'
-        };
-        setUser(dummyUser);
+        // Use mainUser from DB if role is user, otherwise generic admin
+        const userData = role === 'admin' ? {
+            id: 'admin_1',
+            name: 'Admin User',
+            role: 'admin',
+            email: 'admin@cyop.com'
+        } : mainUser;
+
+        setUser(userData);
         setSelectedPatientId('self'); // Reset selection on login
     };
 
@@ -76,7 +82,9 @@ export const AuthProvider = ({ children }) => {
             selectedPatientId,
             setSelectedPatientId,
             foodDatabase,
-            addCustomFoods
+            addCustomFoods,
+            updateUser: (updates) => setUser(prev => ({ ...prev, ...updates })),
+            updatePatient: (id, updates) => setPatients(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
         }}>
             {children}
         </AuthContext.Provider>

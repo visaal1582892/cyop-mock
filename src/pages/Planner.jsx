@@ -47,6 +47,41 @@ const Planner = () => {
         }
     }, [showSettings, selectedPatientId, userStats]);
 
+    // Recalculate TDEE when Buffer Patient Changes (Draft Mode)
+    useEffect(() => {
+        // Find profile
+        let profile = user;
+        if (bufferPatientId !== 'self') {
+            profile = patients.find(p => p.id === bufferPatientId);
+        }
+
+        // Calculate fresh TDEE based on their weight
+        // Fallback to 60kg if missing to prevent NaN/Crash
+        const weight = profile?.weight || 60;
+        const freshTDEE = calculateTDEE(weight);
+
+        // Try to load saved stats for this patient to be accurate (e.g. if I already saved a goal for "Dad")
+        const saved = localStorage.getItem(`userStats_${bufferPatientId}`);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            // Merge saved stats, but ensure TDEE is fresh from profile (in case weight changed) or use saved?
+            // Priorities: 1. Saved TDEE, 2. Calc from Saved Weight, 3. Fresh (Context) TDEE
+            const effectiveTDEE = parsed.tdee || (parsed.weight ? calculateTDEE(parsed.weight) : freshTDEE);
+            setBufferStats({ ...parsed, tdee: effectiveTDEE });
+        } else {
+            // Use Fresh defaults
+            setBufferStats(prev => ({
+                ...prev,
+                tdee: freshTDEE,
+                targetCalories: freshTDEE, // Reset to maintenance if new
+                targetWeightLoss: 0,
+                // Keep other display preferences or reset them? Let's keep them sticky or reset to default?
+                // Let's reset to defaults for a "clean" switch appearance
+                planDuration: 1
+            }));
+        }
+    }, [bufferPatientId, user, patients]);
+
     const handleBufferStatChange = (key, val) => {
         setBufferStats(prev => ({ ...prev, [key]: val }));
     };
@@ -152,9 +187,14 @@ const Planner = () => {
 
         if (savedStats) {
             const parsed = JSON.parse(savedStats);
+
+            // Robust TDEE resolution
+            const effectiveTDEE = parsed.tdee || (parsed.weight ? calculateTDEE(parsed.weight) : freshTDEE);
+
             statsToLoad = {
+                ...statsToLoad,
                 ...parsed,
-                tdee: freshTDEE, // ALWAY OVERWRITE with fresh TDEE from profile
+                tdee: effectiveTDEE,
             };
         } else {
             // New User/Patient setup
@@ -295,60 +335,63 @@ const Planner = () => {
     const generatePlan = (prefs, force = false) => {
         const duration = prefs.planDuration || 1;
         const newMeals = {};
-        const newBevs = {}; // Initialize newBevs here
-
-        // Define Categories Mapping
-        const CATS = {
-            BREAKFAST: ['Breakfast'],
-            STAPLES: ['Breads', 'Rice'],
-            SIDES: ['Curries', 'Vegetables', 'Dals', 'Soups'],
-            SNACKS: ['Snacks', 'Beverages', 'Fruits'],
-            ACCOMPANIMENTS: ['Salads', 'Dairy']
-        };
+        const newBevs = {};
 
         const userDiet = prefs.dietType || 'veg';
         const userCuisine = prefs.cuisine || 'North Indian';
 
-        // Helper: Get pool based on categories and implementation of Diet/Cuisine preference
-        const getPool = (categories) => {
+        // 1. Precise Categorization for this DB
+        const CATS = {
+            BREAKFAST: ['Breakfast'],
+            // In DB, Roti/Rice are 'Main Course' or 'Cereals & Millets'. 
+            // We include Main Course but logic will try to diversify.
+            STAPLES: ['Main Course', 'Cereals & Millets', 'Breads', 'Rice'],
+            // Dal is Pulses. Paneer is Sides. Chicken is Main Course/Eggs & Poultry.
+            MAINS: ['Pulses & Legumes', 'Sides', 'Eggs & Poultry', 'Main Course'],
+            // Lighter sides/accompaniments
+            SIDES: ['Dairy', 'Sides', 'Vegetables', 'Salads', 'Soups'],
+            SNACKS: ['Nuts & Oilseeds', 'Fruits', 'Snacks', 'Beverages', 'Dairy'], // Yogurt/Milk good for snacks
+        };
+
+        // 2. Helper: Get Pool
+        const getPool = (categories, strictCuisine = true) => {
             return foodDatabase.filter(f => {
                 if (!categories.includes(f.category)) return false;
 
-                // Diet Check
-                if (userDiet === 'veg' && f.type === 'non-veg') return false;
-                if (userDiet === 'eggitarian' && f.type === 'non-veg') return false;
+                // Diet Check (Strict)
+                if (userDiet === 'veg' && f.type !== 'veg') return false; // Veg means NO egg, NO meat
+                if (userDiet === 'eggitarian' && f.type === 'non-veg') return false; // Eggitarian means NO meat
+                // 'non-veg' allows everything
 
-                // Cuisine Check (Soft Priority or Hard Filter?)
-                // Let's do Soft Priority: If we have cuisine matches, use them. If not, fallback.
-                // For now, simple filter to ensure "Reasonable" plans.
-                // If user wants South Indian, don't show Parathas if possible?
-                // Let's implement strict cuisine filter ONLY if we have items.
-                // For simplicity/robustness, let's just Weight the randomizer or just filter if plenty exist.
-                // Let's try matching region first.
+                // Cuisine Check
+                if (strictCuisine && f.region && f.region !== userCuisine && f.region !== 'All') return false;
+
                 return true;
             });
         };
 
-        // Smart Random Picker with Cuisine Bias
-        const pickItem = (pool) => {
-            if (!pool || pool.length === 0) return null;
+        // 3. Smart Picker with Fallback
+        const pickItem = (categories, excludeIds = []) => {
+            // A. Try Strict Cuisine
+            let pool = getPool(categories, true);
+            // B. Fallback to All Cuisines if empty
+            if (pool.length === 0) pool = getPool(categories, false);
 
-            // Filter by Cuisine if possible
-            const cuisineMatches = pool.filter(f => {
-                if (userCuisine === 'South Indian') return f.region === 'South Indian';
-                if (userCuisine === 'North Indian') return f.region === 'North Indian';
-                return true;
-            });
+            // Exclude already used IDs
+            const filteredPool = pool.filter(i => !excludeIds.includes(i.id));
 
-            // Use formatted pool (cuisine matched or fallback to full pool)
-            const finalPool = cuisineMatches.length > 0 ? cuisineMatches : pool;
+            // If we filtered everyone out, maybe reuse is better than nothing? 
+            // Let's reuse if filteredPool is empty but original pool wasn't.
+            const finalPool = filteredPool.length > 0 ? filteredPool : pool;
+
+            if (finalPool.length === 0) return null;
+
             return finalPool[Math.floor(Math.random() * finalPool.length)];
         };
 
-
+        // 4. Smart Item Creator (Scaling)
         const createSmartItem = (item, targetCals) => {
             if (!item) return null;
-
             // Calculate ratio to hit target
             const ratio = targetCals / item.calories;
 
@@ -389,33 +432,55 @@ const Planner = () => {
             };
         };
 
+        // 5. Build Days
         for (let day = 1; day <= duration; day++) {
             newMeals[day] = { breakfast: [], lunch: [], snacks: [], dinner: [] };
             newBevs[day] = { morningTea: false, eveningTea: false, sugar: true };
 
-            // 1. Breakfast (Main)
-            const bfItem = pickItem(getPool(CATS.BREAKFAST));
+            // Track used items for this day to promote variety
+            const usedIds = [];
+
+            // A. Breakfast (Main Item)
+            const bfItem = pickItem(CATS.BREAKFAST, usedIds);
             if (bfItem) {
                 newMeals[day].breakfast.push(createSmartItem(bfItem, mealTargets.breakfast));
+                usedIds.push(bfItem.id);
             }
 
-            // 2. Lunch & Dinner (Staple + Side)
+            // B. Lunch & Dinner 
+            // Strategy: Staple (40%) + Main Dish (40%) + Side/Accompaniment (20%)
             ['lunch', 'dinner'].forEach(slot => {
                 const target = mealTargets[slot];
-                const staple = pickItem(getPool(CATS.STAPLES));
-                const side = pickItem(getPool(CATS.SIDES));
 
-                if (staple && side) {
-                    newMeals[day][slot].push(createSmartItem(staple, target * 0.55));
-                    newMeals[day][slot].push(createSmartItem(side, target * 0.45));
+                // 1. Staple (e.g. Rice, Roti)
+                const staple = pickItem(CATS.STAPLES, []);
+                // Note: We don't exclude staples because eating Rice for lunch and dinner is common.
+
+                // 2. Main Dish (e.g. Dal, Chicken, Paneer)
+                const main = pickItem(CATS.MAINS, usedIds);
+
+                // 3. Side (e.g. Yogurt, Salad, Veggie)
+                const side = pickItem(CATS.SIDES, usedIds);
+
+                if (staple && main && side) {
+                    newMeals[day][slot].push(createSmartItem(staple, target * 0.40));
+                    newMeals[day][slot].push(createSmartItem(main, target * 0.40));
+                    newMeals[day][slot].push(createSmartItem(side, target * 0.20));
+                    usedIds.push(main.id, side.id);
+                } else if (staple && main) {
+                    // Fallback: 50/50
+                    newMeals[day][slot].push(createSmartItem(staple, target * 0.50));
+                    newMeals[day][slot].push(createSmartItem(main, target * 0.50));
+                    usedIds.push(main.id);
                 } else {
-                    const fallback = pickItem(getPool([...CATS.STAPLES, ...CATS.SIDES]));
+                    // Critical Fallback: Pick anything robust
+                    const fallback = pickItem([...CATS.STAPLES, ...CATS.MAINS], []);
                     if (fallback) newMeals[day][slot].push(createSmartItem(fallback, target));
                 }
             });
 
-            // 3. Snacks
-            const snkItem = pickItem(getPool(CATS.SNACKS));
+            // C. Snacks
+            const snkItem = pickItem(CATS.SNACKS, usedIds);
             if (snkItem) {
                 newMeals[day].snacks.push(createSmartItem(snkItem, mealTargets.snacks));
             }
@@ -423,7 +488,7 @@ const Planner = () => {
 
         setMeals(newMeals);
         setBeverages(newBevs);
-        if (!force) toast.success(`Generated Complete ${duration}-Day Plan!`);
+        if (!force) toast.success(`Generated Reasonable ${duration}-Day Plan!`);
     };
 
     // Helper functions for Current Day

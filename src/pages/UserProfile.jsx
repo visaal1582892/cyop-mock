@@ -4,26 +4,30 @@ import { calculateBMR, calculateTDEE, calculateTargetCalories, calculateMacros }
 import { Activity, Target, Utensils, AlertCircle, Users, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { mainUser } from '../data/userDatabase';
 
 const UserProfile = () => {
-    const { user, patients, selectedPatientId, setSelectedPatientId } = useAuth();
+    const { user, patients, selectedPatientId, setSelectedPatientId, updateUser, updatePatient } = useAuth();
     const navigate = useNavigate();
 
     // Default form data structure
+    // Default form data structure
     const initialForm = {
-        name: "Guest User",
-        age: 30,
-        gender: "male",
-        height: 175,
-        weight: 75,
-        activityLevel: "sedentary"
+        name: mainUser.name,
+        age: mainUser.age,
+        gender: mainUser.gender,
+        height: mainUser.height,
+        weight: mainUser.weight,
+        activityLevel: "sedentary",
+        targetWeightLoss: 0
     };
 
     const [formData, setFormData] = useState(initialForm);
     const [validationErrors, setValidationErrors] = useState({});
     const [stats, setStats] = useState({
         bmr: 0,
-        tdee: 0
+        tdee: 0,
+        targetCalories: 2000
     });
 
     // Load data when selectedPatientId changes
@@ -33,10 +37,25 @@ const UserProfile = () => {
 
         if (savedData) {
             const parsed = JSON.parse(savedData);
-            setFormData({
+
+            // Intelligent Data Resolution
+            let finalData = {
                 ...initialForm,
-                ...parsed, // Merge saved data (might include old goal data, which is fine to ignore)
-            });
+                ...parsed
+            };
+
+            // If we have a saved targetCalorie but NO targetWeightLoss, infer it to prevent overwriting
+            if (parsed.targetCalories && parsed.targetWeightLoss === undefined) {
+                const currentTDEE = calculateTDEE(finalData.weight || 75);
+                const diff = currentTDEE - parsed.targetCalories;
+                // Reverse calc: deficit = (loss * 7700) / 30
+                // loss = (deficit * 30) / 7700
+                if (diff > 0) {
+                    finalData.targetWeightLoss = parseFloat(((diff * 30) / 7700).toFixed(1));
+                }
+            }
+
+            setFormData(finalData);
         } else {
             // New profile or no data, reset to defaults or patient details if available
             if (selectedPatientId !== 'self') {
@@ -47,7 +66,8 @@ const UserProfile = () => {
                     age: patient?.age || 30,
                     gender: patient?.gender || "male",
                     height: patient?.height || 175,
-                    weight: patient?.weight || 75
+                    weight: patient?.weight || 75,
+                    targetWeightLoss: 0
                 });
             } else {
                 setFormData({ ...initialForm, name: user?.name || "Regular User" });
@@ -61,20 +81,31 @@ const UserProfile = () => {
 
         const bmr = calculateBMR(formData.weight, formData.height, formData.age, formData.gender);
         const tdee = calculateTDEE(formData.weight);
-        setStats({ bmr, tdee });
+        const targetCalories = calculateTargetCalories(tdee, formData.targetWeightLoss || 0);
+
+        setStats({ bmr, tdee, targetCalories });
 
     }, [formData, validationErrors]);
 
     const saveProfile = () => {
         const storageKey = `userStats_${selectedPatientId}`;
-        // Preserve existing data (like goals/prefs set in Planner) if possible, or just overwrite?
-        // Safer to read existing again or just spread current formData.
-        // Wait, we want to save PHYSICAL stats here.
-        // If we overwrite, we might lose prefs set in planner if they are stored in same key `userStats_${selectedPatientId}`.
-        // Yes, they are stored in `userStats`. We should merge.
         const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
         const updated = { ...existing, ...formData, ...stats };
         localStorage.setItem(storageKey, JSON.stringify(updated));
+
+        // Sync with Auth Context
+        if (selectedPatientId === 'self') {
+            updateUser({ ...formData });
+        } else {
+            updatePatient(selectedPatientId, {
+                name: formData.name,
+                age: formData.age,
+                gender: formData.gender,
+                height: formData.height,
+                weight: formData.weight
+            });
+        }
+
         toast.success("Profile Updated!");
     };
 
@@ -234,10 +265,14 @@ const UserProfile = () => {
                         <div className={`bg-gray-900 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden transition-all duration-300 ${Object.keys(validationErrors).length > 0 ? 'grayscale opacity-75' : ''}`}>
                             <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/20 rounded-full -mr-10 -mt-10 blur-3xl"></div>
                             <div className="relative z-10">
-                                <p className="text-gray-400 font-medium text-sm uppercase tracking-wide">Current Calorie Intake</p>
-                                <h2 className="text-6xl font-bold mt-2 tracking-tight">{stats.tdee}</h2>
+                                <p className="text-gray-400 font-medium text-sm uppercase tracking-wide">Daily Calorie Target</p>
+                                <h2 className="text-6xl font-bold mt-2 tracking-tight">{stats.targetCalories}</h2>
                                 <span className="text-xl text-gray-500">kcal/day</span>
-                                <p className="text-xs text-gray-400 mt-2">Required to maintain current weight</p>
+                                <p className="text-xs text-gray-400 mt-2">
+                                    {formData.targetWeightLoss !== 0
+                                        ? `Adjusted for ${formData.targetWeightLoss > 0 ? 'Weight Loss' : 'Weight Gain'}`
+                                        : 'Required to maintain current weight'}
+                                </p>
                             </div>
                         </div>
 
