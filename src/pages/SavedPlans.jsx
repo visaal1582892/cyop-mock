@@ -22,6 +22,32 @@ const SavedPlans = () => {
         }
     };
 
+    // Helper to calculate covered calories
+    const getPlanCalories = (plan) => {
+        if (!plan || !plan.meals) return 0;
+        const days = Object.keys(plan.meals);
+        if (days.length === 0) return 0;
+
+        let totalCals = 0;
+        days.forEach(day => {
+            // Meals
+            ['breakfast', 'lunch', 'snacks', 'dinner'].forEach(slot => {
+                const items = plan.meals[day]?.[slot] || [];
+                items.forEach(item => totalCals += (item.calories || 0));
+            });
+
+            // Beverages
+            const bevs = plan.beverages?.[day];
+            if (bevs) {
+                if (bevs.morningTea) totalCals += 40;
+                if (bevs.eveningTea) totalCals += 40;
+                if (bevs.sugar && (bevs.morningTea || bevs.eveningTea)) totalCals += 30;
+            }
+        });
+
+        return Math.round(totalCals / days.length);
+    };
+
     useEffect(() => {
         loadPlans();
     }, [selectedPatientId]);
@@ -146,9 +172,11 @@ const SavedPlans = () => {
                                             </div>
                                             <div>
                                                 <h3 className="text-lg font-bold text-gray-800 line-clamp-1" title={name}>{name}</h3>
-                                                <span className="text-xs text-gray-400 font-medium">
-                                                    {savedPlans[name]?.meals ? Object.keys(savedPlans[name].meals).length : 0} Days
-                                                </span>
+                                                <div className="flex gap-2 text-xs text-gray-500 font-medium mt-1">
+                                                    <span>{savedPlans[name]?.meals ? Object.keys(savedPlans[name].meals).length : 0} Days</span>
+                                                    <span>•</span>
+                                                    <span className="text-emerald-600 font-bold">{getPlanCalories(savedPlans[name])} kcal/day</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

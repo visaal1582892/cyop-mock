@@ -264,7 +264,11 @@ const Planner = () => {
         if (!planName.trim()) return;
         const newSaved = {
             ...savedPlans,
-            [planName]: { meals, beverages }
+            [planName]: {
+                meals,
+                beverages,
+                targetCalories: userStats.targetCalories
+            }
         };
         setSavedPlans(newSaved);
         localStorage.setItem(`saved_plans_${selectedPatientId}`, JSON.stringify(newSaved));

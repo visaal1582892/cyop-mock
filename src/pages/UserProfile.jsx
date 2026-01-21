@@ -11,7 +11,6 @@ const UserProfile = () => {
     const navigate = useNavigate();
 
     // Default form data structure
-    // Default form data structure
     const initialForm = {
         name: mainUser.name,
         age: mainUser.age,
@@ -266,7 +265,7 @@ const UserProfile = () => {
                             <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/20 rounded-full -mr-10 -mt-10 blur-3xl"></div>
                             <div className="relative z-10">
                                 <p className="text-gray-400 font-medium text-sm uppercase tracking-wide">Daily Calorie Target</p>
-                                <h2 className="text-6xl font-bold mt-2 tracking-tight">{stats.targetCalories}</h2>
+                                <h2 className="text-6xl font-bold mt-2 tracking-tight">{stats.tdee}</h2>
                                 <span className="text-xl text-gray-500">kcal/day</span>
                                 <p className="text-xs text-gray-400 mt-2">
                                     {formData.targetWeightLoss !== 0
