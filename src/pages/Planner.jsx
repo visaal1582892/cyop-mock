@@ -610,7 +610,8 @@ const Planner = () => {
     };
 
     const openEdit = (type, item) => {
-        setEditingItem({ type, ...item });
+        // Store meal slot as 'editSlot' to avoid conflict with item.type ('veg'/'non-veg')
+        setEditingItem({ editSlot: type, ...item });
 
         if (item.composition) {
             // Setup composition editing
@@ -843,15 +844,14 @@ const Planner = () => {
 
         setMeals(prev => {
             const dayMeals = prev[currentDay] || {};
-            // editingItem.type serves as the meal slot key (breakfast, etc.)
-            const currentSlotItems = dayMeals[editingItem.type] || [];
+            const slotName = editingItem.editSlot;
+            const currentSlotItems = dayMeals[slotName] || [];
 
             return {
                 ...prev,
                 [currentDay]: {
                     ...dayMeals,
-                    // Map to find and replace the exact item by UUID
-                    [editingItem.type]: currentSlotItems.map(i => i.uuid === editingItem.uuid ? updatedItem : i)
+                    [slotName]: currentSlotItems.map(i => i.uuid === editingItem.uuid ? updatedItem : i)
                 }
             };
         });
@@ -1293,9 +1293,33 @@ const Planner = () => {
                 editingItem && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-end md:items-center justify-center p-0 md:p-4 print:hidden">
                         <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                            <div className="p-6 border-b border-gray-100 shrink-0">
-                                <h3 className="text-xl font-bold text-gray-900 mb-1">Edit {editingItem.composition ? 'Composition' : 'Portion'}</h3>
-                                <p className="text-sm text-gray-500">{editingItem.name}</p>
+                            <div className="p-6 border-b border-gray-100 shrink-0 bg-gray-50/50">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-1">Edit {editingItem.composition ? 'Composition' : 'Portion'}</h3>
+                                        <p className="text-sm text-gray-500">{editingItem.name}</p>
+                                    </div>
+                                    <button onClick={() => setEditingItem(null)} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
+                                </div>
+
+                                {/* Dynamic Totals Header */}
+                                {editingItem.composition && (
+                                    <div className="flex gap-4 p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
+                                        <div className="flex-1">
+                                            <div className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-0.5">EST. CALORIES</div>
+                                            <div className="text-2xl font-bold text-emerald-600">
+                                                {Math.round(editComposition.reduce((sum, item) => sum + (item.calories || 0), 0))} <span className="text-sm font-medium text-gray-400">kcal</span>
+                                            </div>
+                                        </div>
+                                        <div className="w-px bg-gray-100"></div>
+                                        <div className="flex-1">
+                                            <div className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-0.5">TOTAL WEIGHT</div>
+                                            <div className="text-2xl font-bold text-gray-700">
+                                                {Math.round(editComposition.reduce((sum, item) => sum + (parseFloat(item.weight) || 0), 0))} <span className="text-sm font-medium text-gray-400">g</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="p-6 overflow-y-auto">
@@ -1320,15 +1344,6 @@ const Planner = () => {
                                                     </div>
                                                 </div>
                                             ))}
-                                        </div>
-
-                                        <div className="flex justify-between items-center pt-2 text-sm">
-                                            <span className="font-bold text-gray-500">Total Weight:</span>
-                                            <span className="font-bold text-gray-900">{Math.round(editComposition.reduce((a, b) => a + (parseFloat(b.weight) || 0), 0))}g</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="font-bold text-gray-500">Est. Calories:</span>
-                                            <span className="font-bold text-emerald-600">{Math.round(editComposition.reduce((a, b) => a + (b.calories || 0), 0))} kcal</span>
                                         </div>
                                     </div>
                                 ) : (
