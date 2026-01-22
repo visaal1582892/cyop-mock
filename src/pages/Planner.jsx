@@ -35,6 +35,10 @@ const Planner = () => {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
 
+    // Swap Logic State
+    const [swappingItem, setSwappingItem] = useState(null); // { mealType, originalItem }
+    const [swapSearchQuery, setSwapSearchQuery] = useState("");
+
     // --- Settings Modal Logic (Buffered State) ---
     const [bufferPatientId, setBufferPatientId] = useState(selectedPatientId);
     const [bufferStats, setBufferStats] = useState(userStats);
@@ -344,68 +348,74 @@ const Planner = () => {
         const userDiet = prefs.dietType || 'veg';
         const userCuisine = prefs.cuisine || 'North Indian';
 
-        // 1. Precise Categorization for this DB
+        // 1. Precise Categorization
+        // Staples are the base (Rice, Roti, Bread)
+        const STAPLE_KEYWORDS = ['Roti', 'Chapati', 'Rice', 'Phulka', 'Naan', 'Paratha', 'Bhatura', 'Kulcha', 'Bread', 'Dosa', 'Idli'];
+
+        // Helper to check if item is a staple
+        const isStaple = (item) => {
+            return STAPLE_KEYWORDS.some(k => item.name.includes(k) || item.subType.includes(k)) ||
+                ['Breads', 'Cereals & Millets'].includes(item.category);
+        };
+
         const CATS = {
             BREAKFAST: ['Breakfast'],
-            // In DB, Roti/Rice are 'Main Course' or 'Cereals & Millets'. 
-            // We include Main Course but logic will try to diversify.
-            STAPLES: ['Main Course', 'Cereals & Millets', 'Breads', 'Rice'],
-            // Dal is Pulses. Paneer is Sides. Chicken is Main Course/Eggs & Poultry.
-            MAINS: ['Pulses & Legumes', 'Sides', 'Eggs & Poultry', 'Main Course'],
-            // Lighter sides/accompaniments
-            SIDES: ['Dairy', 'Sides', 'Vegetables', 'Salads', 'Soups'],
-            SNACKS: ['Nuts & Oilseeds', 'Fruits', 'Snacks', 'Beverages', 'Dairy'], // Yogurt/Milk good for snacks
+            // Explicitly separate Staples from Mains
+            MAINS: ['Pulses & Legumes', 'Eggs & Poultry', 'Main Course'], // Curries, Dals, Sabzis
+            SIDES: ['Sides', 'Vegetables', 'Salads', 'Soups'],     // Accompaniments
+            SNACKS: ['Nuts & Oilseeds', 'Fruits', 'Snacks', 'Beverages', 'Dairy'],
         };
 
         // 2. Helper: Get Pool
-        const getPool = (categories, strictCuisine = true) => {
+        const getPool = (categories, strictCuisine = true, excludeStaples = false, mustBeStaple = false) => {
             return foodDatabase.filter(f => {
-                if (!categories.includes(f.category)) return false;
+                if (!f.isCooked) return false; // Safety check for raw items
+
+                // Category Check
+                // If asking for specific categories, check them used
+                // BUT if we want a "Staple", we might look across Main Course too, so we rely on isStaple check mostly for that.
+                if (categories && !categories.includes(f.category)) {
+                    // If we are looking for staples, we might allow Main Course if it passes isStaple
+                    if (mustBeStaple && f.category === 'Main Course' && isStaple(f)) {
+                        // allow
+                    } else {
+                        return false;
+                    }
+                }
 
                 // Diet Check (Strict)
-                if (userDiet === 'veg' && f.type !== 'veg') return false; // Veg means NO egg, NO meat
-                if (userDiet === 'eggitarian' && f.type === 'non-veg') return false; // Eggitarian means NO meat
-                // 'non-veg' allows everything
+                if (userDiet === 'veg' && f.type !== 'veg') return false;
+                if (userDiet === 'eggitarian' && f.type === 'non-veg') return false;
 
                 // Cuisine Check
                 if (strictCuisine && f.region && f.region !== userCuisine && f.region !== 'All') return false;
+
+                // Logic Check
+                if (excludeStaples && isStaple(f)) return false;
+                if (mustBeStaple && !isStaple(f)) return false;
 
                 return true;
             });
         };
 
-        // 3. Smart Picker with Fallback
-        const pickItem = (categories, excludeIds = []) => {
-            // A. Try Strict Cuisine
-            let pool = getPool(categories, true);
-            // B. Fallback to All Cuisines if empty
-            if (pool.length === 0) pool = getPool(categories, false);
-
-            // Exclude already used IDs
-            const filteredPool = pool.filter(i => !excludeIds.includes(i.id));
-
-            // If we filtered everyone out, maybe reuse is better than nothing? 
-            // Let's reuse if filteredPool is empty but original pool wasn't.
-            const finalPool = filteredPool.length > 0 ? filteredPool : pool;
-
-            if (finalPool.length === 0) return null;
-
-            return finalPool[Math.floor(Math.random() * finalPool.length)];
+        // 3. Smart Picker
+        const pickItem = (pool, excludeIds = []) => {
+            const filtered = pool.filter(i => !excludeIds.includes(i.id));
+            const final = filtered.length > 0 ? filtered : pool;
+            if (final.length === 0) return null;
+            return final[Math.floor(Math.random() * final.length)];
         };
 
         // 4. Smart Item Creator (Scaling)
         const createSmartItem = (item, targetCals) => {
             if (!item) return null;
-            // Calculate ratio to hit target
             const ratio = targetCals / item.calories;
 
-            // New Total Weight
             let baseWeight = 100;
             if (item.servingSize && item.servingSize.includes('g')) baseWeight = parseInt(item.servingSize) || 100;
 
             const newWeight = Math.round(baseWeight * ratio);
 
-            // Handle Composition
             let newComposition = null;
             if (item.composition) {
                 newComposition = item.composition.map(c => ({
@@ -423,13 +433,10 @@ const Planner = () => {
                 uuid: Date.now() + Math.random(),
                 baseCalories: item.calories,
                 baseWeight: baseWeight,
-
-                // Scaled Values
                 calories: Math.round(targetCals),
                 protein: Math.round((item.protein || 0) * ratio),
                 carbs: Math.round((item.carbs || 0) * ratio),
                 fats: Math.round((item.fats || 0) * ratio),
-
                 heading: `Smart Portion (${newWeight}g)`,
                 servingDetails: `${newWeight}g (Auto)`,
                 composition: newComposition
@@ -440,31 +447,51 @@ const Planner = () => {
         for (let day = 1; day <= duration; day++) {
             newMeals[day] = { breakfast: [], lunch: [], snacks: [], dinner: [] };
             newBevs[day] = { morningTea: false, eveningTea: false, sugar: true };
-
-            // Track used items for this day to promote variety
             const usedIds = [];
 
-            // A. Breakfast (Main Item)
-            const bfItem = pickItem(CATS.BREAKFAST, usedIds);
+            // A. Breakfast
+            // Breakfast is usually self-contained (Idli, Dosa, Poha) which are staples themselves but in Breakfast category
+            const bfPool = getPool(CATS.BREAKFAST, true);
+            // If strictly North Indian breakfast is empty (rare but possible), allow simple all-region
+            const finalBfPool = bfPool.length ? bfPool : getPool(CATS.BREAKFAST, false);
+            const bfItem = pickItem(finalBfPool, usedIds);
+
             if (bfItem) {
                 newMeals[day].breakfast.push(createSmartItem(bfItem, mealTargets.breakfast));
                 usedIds.push(bfItem.id);
             }
 
             // B. Lunch & Dinner 
-            // Strategy: Staple (40%) + Main Dish (40%) + Side/Accompaniment (20%)
             ['lunch', 'dinner'].forEach(slot => {
                 const target = mealTargets[slot];
 
-                // 1. Staple (e.g. Rice, Roti)
-                const staple = pickItem(CATS.STAPLES, []);
-                // Note: We don't exclude staples because eating Rice for lunch and dinner is common.
+                // 1. Pick Staple (The Base)
+                // North Indian -> Prefer Roti/Wheat
+                // South Indian -> Prefer Rice
+                // WE try to find a staple appropriate for the region
+                let staplePool = getPool(['Main Course', 'Cereals & Millets', 'Breads'], true, false, true);
+                if (staplePool.length === 0) staplePool = getPool(['Main Course', 'Cereals & Millets', 'Breads'], false, false, true);
 
-                // 2. Main Dish (e.g. Dal, Chicken, Paneer)
-                const main = pickItem(CATS.MAINS, usedIds);
+                // Refine Staple by Cuisine preference if possible
+                if (userCuisine === 'North Indian') {
+                    const wheat = staplePool.filter(i => i.name.includes('Roti') || i.name.includes('Paratha'));
+                    if (wheat.length) staplePool = wheat;
+                } else if (userCuisine === 'South Indian') {
+                    const rice = staplePool.filter(i => i.name.includes('Rice'));
+                    if (rice.length) staplePool = rice;
+                }
 
-                // 3. Side (e.g. Yogurt, Salad, Veggie)
-                const side = pickItem(CATS.SIDES, usedIds);
+                const staple = pickItem(staplePool, []); // Don't track staples in usedIds to allow repetition (Roti everyday is fine)
+
+                // 2. Pick Main (Dal, Curry) - EXCLUDE Staples
+                let mainPool = getPool(CATS.MAINS, true, true, false); // Strict Cuisine, Exclude Staples
+                if (mainPool.length === 0) mainPool = getPool(CATS.MAINS, false, true, false);
+                const main = pickItem(mainPool, usedIds);
+
+                // 3. Pick Side (Sabzi, Salad)
+                let sidePool = getPool(CATS.SIDES, true);
+                if (sidePool.length === 0) sidePool = getPool(CATS.SIDES, false);
+                const side = pickItem(sidePool, usedIds);
 
                 if (staple && main && side) {
                     newMeals[day][slot].push(createSmartItem(staple, target * 0.40));
@@ -472,19 +499,20 @@ const Planner = () => {
                     newMeals[day][slot].push(createSmartItem(side, target * 0.20));
                     usedIds.push(main.id, side.id);
                 } else if (staple && main) {
-                    // Fallback: 50/50
+                    // Fallback
                     newMeals[day][slot].push(createSmartItem(staple, target * 0.50));
                     newMeals[day][slot].push(createSmartItem(main, target * 0.50));
                     usedIds.push(main.id);
                 } else {
-                    // Critical Fallback: Pick anything robust
-                    const fallback = pickItem([...CATS.STAPLES, ...CATS.MAINS], []);
+                    // Extreme Fallback
+                    const fallback = pickItem(getPool(CATS.MAINS, false), []);
                     if (fallback) newMeals[day][slot].push(createSmartItem(fallback, target));
                 }
             });
 
             // C. Snacks
-            const snkItem = pickItem(CATS.SNACKS, usedIds);
+            const snkPool = getPool(CATS.SNACKS, false);
+            const snkItem = pickItem(snkPool, usedIds);
             if (snkItem) {
                 newMeals[day].snacks.push(createSmartItem(snkItem, mealTargets.snacks));
             }
@@ -492,7 +520,7 @@ const Planner = () => {
 
         setMeals(newMeals);
         setBeverages(newBevs);
-        if (!force) toast.success(`Generated Reasonable ${duration}-Day Plan!`);
+        if (!force) toast.success(`Generated Smart ${duration}-Day Plan!`);
     };
 
     // Helper functions for Current Day
@@ -588,7 +616,7 @@ const Planner = () => {
             // Setup composition editing
             setEditComposition(item.composition.map(c => ({
                 ...c,
-                originalWeight: c.weight,
+                originalWeight: c.weight, // Store initial weight
                 originalVals: {
                     cals: c.calories,
                     pro: c.protein,
@@ -606,31 +634,147 @@ const Planner = () => {
 
     const handleCompositionChange = (index, newWeight) => {
         const updated = [...editComposition];
-        const comp = updated[index];
-        const w = parseFloat(newWeight) || 0;
+        const originalComp = updated[index];
+        const comp = { ...originalComp }; // Deep copy
+        updated[index] = comp;
 
-        // Use original values if available to prevent generic rounding drift
+        const w = parseFloat(newWeight);
+        // If NaN (empty string), we still update weight to allow clearing input, but keep calc safe
+        const safeW = isNaN(w) ? 0 : w;
+
+        // Use original values if available for precision
         if (comp.originalVals && comp.originalWeight) {
-            const ratio = w / comp.originalWeight;
-            comp.weight = w;
+            const ratio = safeW / comp.originalWeight;
+            comp.weight = newWeight;
             comp.calories = Math.round(comp.originalVals.cals * ratio);
             comp.protein = Math.round((comp.originalVals.pro || 0) * ratio * 10) / 10;
             comp.carbs = Math.round((comp.originalVals.carbs || 0) * ratio * 10) / 10;
             comp.fats = Math.round((comp.originalVals.fats || 0) * ratio * 10) / 10;
-        } else if (comp.weight > 0) {
-            // Fallback
-            const ratio = w / comp.weight;
-            comp.weight = w;
-            comp.calories = Math.round(comp.calories * ratio);
-            comp.protein = (comp.protein || 0) * ratio;
-            comp.carbs = (comp.carbs || 0) * ratio;
-            comp.fats = (comp.fats || 0) * ratio;
         } else {
-            comp.weight = w;
+            // Fallback if no history (shouldn't happen with correct openEdit) or new item
+            const currentWeight = parseFloat(comp.weight) || 100; // avoid div by zero
+            const ratio = safeW / (currentWeight > 0 ? currentWeight : 1);
+
+            comp.weight = newWeight;
+            comp.calories = Math.round(comp.calories * ratio);
+            comp.protein = Math.round((comp.protein || 0) * ratio * 10) / 10;
+            comp.carbs = Math.round((comp.carbs || 0) * ratio * 10) / 10;
+            comp.fats = Math.round((comp.fats || 0) * ratio * 10) / 10;
         }
 
         setEditComposition(updated);
     }
+
+    // --- SWAP LOGIC ---
+
+    const getMacroProfile = (item) => {
+        const p = item.protein || 0;
+        const c = item.carbs || 0;
+        const f = item.fats || 0;
+        const total = p + c + f;
+        if (total === 0) return 'Balanced';
+
+        const pRat = p / total;
+        const cRat = c / total;
+        const fRat = f / total;
+
+        if (pRat > 0.4) return 'Protein-Rich';
+        if (cRat > 0.5) return 'Carb-Heavy';
+        if (fRat > 0.45) return 'Fat-Heavy';
+        return 'Balanced';
+    };
+
+    const getSimilarItems = (item) => {
+        if (!item) return [];
+        const targetType = item.type; // veg, non-veg, egg
+        const targetCategory = item.category;
+        const targetProfile = getMacroProfile(item);
+
+        return foodDatabase.filter(f => {
+            // 0. Filter Logic (Cooked Only)
+            if (!f.isCooked) return false;
+
+            // 1. Strict Type Match
+            if (f.type !== targetType) return false;
+
+            // 2. Category Match (Loose or Strict)
+            // For now, let's keep it strict to avoid breakfast items in dinner etc. 
+            // BUT, allow some crossover for Main Course / Cereals
+            const isMainStaple = ['Main Course', 'Cereals & Millets', 'Pulses & Legumes'].includes(targetCategory);
+            const refIsMainStaple = ['Main Course', 'Cereals & Millets', 'Pulses & Legumes'].includes(f.category);
+
+            if (isMainStaple && refIsMainStaple) {
+                // allowed to mix
+            } else if (f.category !== targetCategory) {
+                return false;
+            }
+
+            // 3. CPF Composition Match (Dominant Macro)
+            const refProfile = getMacroProfile(f);
+            if (refProfile !== targetProfile) return false;
+
+            // 4. Search Query Filter
+            if (swapSearchQuery) {
+                return f.name.toLowerCase().includes(swapSearchQuery.toLowerCase());
+            }
+
+            return f.id !== item.id; // Don't show self
+        });
+    };
+
+    const initiateSwap = (mealType, item) => {
+        setSwappingItem({ mealType, originalItem: item });
+        setSwapSearchQuery("");
+    };
+
+    const confirmSwap = (newItem) => {
+        if (!swappingItem) return;
+
+        // Use the generic swapItem function
+        // Need to possibly smart-scale the newItem to match the calories of originalItem?
+        // Let's offer a "Direct Swap" first, user can edit portion later. 
+        // OR better: Scale `newItem` to match `swappingItem.originalItem.calories` approximately.
+
+        const originalCals = swappingItem.originalItem.calories;
+        const ratio = originalCals / newItem.calories;
+
+        // Create scaled item
+        let baseWeight = 100;
+        if (newItem.servingSize && newItem.servingSize.includes('g')) baseWeight = parseInt(newItem.servingSize) || 100;
+
+        // Composition handling for deep copy
+        let newComposition = null;
+        if (newItem.composition) {
+            newComposition = newItem.composition.map(c => ({
+                ...c,
+                weight: Math.round(c.weight * ratio),
+                calories: Math.round(c.calories * ratio),
+                protein: Math.round((c.protein || 0) * ratio * 10) / 10,
+                carbs: Math.round((c.carbs || 0) * ratio * 10) / 10,
+                fats: Math.round((c.fats || 0) * ratio * 10) / 10
+            }));
+        }
+
+        const scaledItem = {
+            ...newItem,
+            uuid: Date.now(), // New ID for the fresh item
+            baseCalories: newItem.calories,
+            baseWeight: baseWeight,
+
+            // Apply Scaling
+            calories: Math.round(originalCals),
+            protein: Math.round((newItem.protein || 0) * ratio),
+            carbs: Math.round((newItem.carbs || 0) * ratio),
+            fats: Math.round((newItem.fats || 0) * ratio),
+
+            servingDetails: `${Math.round(baseWeight * ratio)}g (Swapped)`,
+            composition: newComposition,
+            isSwapped: true
+        };
+
+        swapItem(swappingItem.mealType, swappingItem.originalItem, scaledItem);
+        setSwappingItem(null);
+    };
 
     const saveEdit = () => {
         if (!editingItem) return;
@@ -645,9 +789,23 @@ const Planner = () => {
             const newTotalCarbs = editComposition.reduce((acc, c) => acc + (c.carbs || 0), 0);
             const newTotalFats = editComposition.reduce((acc, c) => acc + (c.fats || 0), 0);
 
+            // Clean composition array (remove editing metadata)
+            const cleanComposition = editComposition.map(c => {
+                // Return only necessary fields to avoid polluting DB/Storage
+                return {
+                    name: c.name,
+                    weight: parseFloat(c.weight) || 0,
+                    calories: c.calories,
+                    protein: c.protein,
+                    carbs: c.carbs,
+                    fats: c.fats
+                    // Exclude originalWeight, originalVals
+                };
+            });
+
             updatedItem = {
                 ...updatedItem,
-                composition: editComposition,
+                composition: cleanComposition,
                 calories: Math.round(newTotalCals),
                 protein: Math.round(newTotalPro),
                 carbs: Math.round(newTotalCarbs),
@@ -658,7 +816,7 @@ const Planner = () => {
         } else {
             // Legacy simple edit
             if (!editAmount) return;
-            const newWeight = parseInt(editAmount);
+            const newWeight = parseFloat(editAmount); // Changed to parseFloat for decimal support
             if (isNaN(newWeight) || newWeight <= 0) return;
 
             // Calculate new calories
@@ -685,11 +843,14 @@ const Planner = () => {
 
         setMeals(prev => {
             const dayMeals = prev[currentDay] || {};
+            // editingItem.type serves as the meal slot key (breakfast, etc.)
             const currentSlotItems = dayMeals[editingItem.type] || [];
+
             return {
                 ...prev,
                 [currentDay]: {
                     ...dayMeals,
+                    // Map to find and replace the exact item by UUID
                     [editingItem.type]: currentSlotItems.map(i => i.uuid === editingItem.uuid ? updatedItem : i)
                 }
             };
@@ -891,6 +1052,15 @@ const Planner = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {/* Swap Button */}
+                                            <div
+                                                onClick={(e) => { e.stopPropagation(); initiateSwap(type, item); }}
+                                                className="bg-white p-1.5 rounded-lg text-blue-500 opacity-0 group-hover:opacity-100 shadow-sm transition-all scale-90 group-hover:scale-100 hover:bg-blue-50"
+                                                title="Swap with similar item"
+                                            >
+                                                <RefreshCw size={14} />
+                                            </div>
+
                                             {/* Edit Icon visible on hover */}
                                             <div className="bg-white p-1.5 rounded-lg text-emerald-500 opacity-0 group-hover:opacity-100 shadow-sm transition-all scale-90 group-hover:scale-100">
                                                 <Flame size={14} />
@@ -1121,9 +1291,9 @@ const Planner = () => {
             {/* Edit Portion Modal */}
             {
                 editingItem && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 print:hidden">
-                        <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                            <div className="p-6 border-b border-gray-100">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-end md:items-center justify-center p-0 md:p-4 print:hidden">
+                        <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                            <div className="p-6 border-b border-gray-100 shrink-0">
                                 <h3 className="text-xl font-bold text-gray-900 mb-1">Edit {editingItem.composition ? 'Composition' : 'Portion'}</h3>
                                 <p className="text-sm text-gray-500">{editingItem.name}</p>
                             </div>
@@ -1142,7 +1312,7 @@ const Planner = () => {
                                                     <div className="flex items-center gap-2">
                                                         <input
                                                             type="number"
-                                                            value={Math.round(comp.weight)}
+                                                            value={comp.weight}
                                                             onChange={(e) => handleCompositionChange(idx, e.target.value)}
                                                             className="w-16 text-right font-bold text-emerald-600 border-b border-emerald-200 focus:border-emerald-500 outline-none bg-transparent"
                                                         />
@@ -1186,6 +1356,78 @@ const Planner = () => {
                     </div>
                 )
             }
+            {/* Swap Modal */}
+            {swappingItem && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[65] flex items-end md:items-center justify-center p-0 md:p-4 print:hidden">
+                    <div className="bg-white w-full md:max-w-xl rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-200 flex flex-col h-[85vh] md:h-[600px]">
+                        <div className="p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                        <RefreshCw className="text-blue-500" size={20} /> Swap Item
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Finding alternatives for <span className="font-bold text-gray-700">{swappingItem.originalItem.name}</span>
+                                    </p>
+                                </div>
+                                <button onClick={() => setSwappingItem(null)} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
+                            </div>
+
+                            {/* Reference Badge */}
+                            <div className="flex gap-2 mb-4">
+                                <span className={`text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wider ${swappingItem.originalItem.type === 'veg' ? 'bg-green-100 text-green-700' :
+                                    swappingItem.originalItem.type === 'non-veg' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                    }`}>
+                                    {swappingItem.originalItem.type}
+                                </span>
+                                <span className="text-xs font-bold px-2 py-1 rounded-md bg-gray-100 text-gray-600 uppercase tracking-wider">
+                                    {getMacroProfile(swappingItem.originalItem)}
+                                </span>
+                            </div>
+
+                            <div className="relative">
+                                <Search className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder="Search specific item..."
+                                    className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+                                    value={swapSearchQuery}
+                                    onChange={(e) => setSwapSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="overflow-y-auto p-2 flex-1 space-y-1">
+                            {getSimilarItems(swappingItem.originalItem).length > 0 ? (
+                                getSimilarItems(swappingItem.originalItem).map(item => (
+                                    <div key={item.id} onClick={() => confirmSwap(item)} className="group flex justify-between items-center p-3 hover:bg-blue-50 rounded-xl cursor-pointer transition-all border border-transparent hover:border-blue-100">
+                                        <div>
+                                            <div className="font-bold text-gray-800 text-sm group-hover:text-blue-700">{item.name}</div>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <span className="text-xs font-medium text-gray-500">{item.calories} kcal / {item.servingSize}</span>
+                                                <div className="flex gap-1 text-[10px] uppercase font-bold text-gray-400">
+                                                    <span className="text-blue-400">P:{item.protein}</span>
+                                                    <span className="text-emerald-400">C:{item.carbs}</span>
+                                                    <span className="text-orange-400">F:{item.fats}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button className="text-xs font-bold bg-white text-gray-400 border border-gray-200 px-3 py-1.5 rounded-lg group-hover:bg-blue-500 group-hover:text-white group-hover:border-blue-500 transition-all shadow-sm">
+                                            Select
+                                        </button>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-10">
+                                    <p className="text-gray-400 font-medium text-sm">No similar items found.</p>
+                                    <p className="text-xs text-gray-300 mt-1">Try a different search or category.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div >
     );
 };
