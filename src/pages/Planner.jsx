@@ -1055,17 +1055,17 @@ const Planner = () => {
                                             {/* Swap Button */}
                                             <div
                                                 onClick={(e) => { e.stopPropagation(); initiateSwap(type, item); }}
-                                                className="bg-white p-1.5 rounded-lg text-blue-500 opacity-0 group-hover:opacity-100 shadow-sm transition-all scale-90 group-hover:scale-100 hover:bg-blue-50"
+                                                className="bg-white p-1.5 rounded-lg text-blue-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 shadow-sm transition-all scale-100 md:scale-90 md:group-hover:scale-100 hover:bg-blue-50"
                                                 title="Swap with similar item"
                                             >
                                                 <RefreshCw size={14} />
                                             </div>
 
-                                            {/* Edit Icon visible on hover */}
-                                            <div className="bg-white p-1.5 rounded-lg text-emerald-500 opacity-0 group-hover:opacity-100 shadow-sm transition-all scale-90 group-hover:scale-100">
+                                            {/* Edit Icon visible on mobile or hover */}
+                                            <div className="bg-white p-1.5 rounded-lg text-emerald-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 shadow-sm transition-all scale-100 md:scale-90 md:group-hover:scale-100">
                                                 <Flame size={14} />
                                             </div>
-                                            <button onClick={(e) => { e.stopPropagation(); removeFood(type, item.uuid); }} className="text-gray-300 hover:text-rose-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"><Trash2 size={16} /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); removeFood(type, item.uuid); }} className="text-gray-300 hover:text-rose-500 p-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity print:hidden"><Trash2 size={16} /></button>
                                         </div>
                                     </div>
                                 ))}
